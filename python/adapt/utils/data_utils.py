@@ -13,6 +13,8 @@ from sklearn.preprocessing import MinMaxScaler
 from itertools import combinations, product
 import pickle
 import tensorflow as tf
+from adapt.ml.dl_subclass import get_test
+from adapt.ml.lda import eval_lda
 
 def load_raw(filename):
     struct = scipy.io.loadmat(filename)
@@ -189,6 +191,32 @@ def prep_test_data(d,raw,params,real_noise_temp):
     x_test_lda = extract_feats(x_test_noise,ft=d.feat_type,emg_scale=d.emg_scale)
 
     return x_test_cnn, x_test_mlp, x_test_lda, y_test_clean, clean_size
+
+def test_loop(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c):
+    acc = np.empty((3,))
+    test_loss = tf.keras.metrics.Mean(name='test_loss')
+    test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
+    test_loss.reset_states()
+    test_accuracy.reset_states()
+
+    # test CNN
+    test_mod = get_test()
+    test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy)
+    acc[0] = test_accuracy.result()*100
+
+    # test MLP
+    test_loss.reset_states()
+    test_accuracy.reset_states()
+
+    test_mod = get_test()
+    test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy)
+    acc[1] = test_accuracy.result()*100
+
+    # test LDA
+    acc[2] = eval_lda(w, c, x_lda, y_lda) * 100
+
+    return acc
+    
 
 def train_data_split(raw, params, sub, sub_type, dt=0, train_grp=2, load=True, test_i = 5, valid_i = 5):
     if dt == 0:
