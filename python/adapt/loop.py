@@ -1,7 +1,40 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import get_test
-from adapt.ml.lda import eval_lda
+from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test
+from adapt.ml.lda import train_lda, eval_lda
+
+def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30):
+    # Train NNs
+    mlp = MLP(n_class=n_dof)
+    cnn = CNN(n_class=n_dof)
+
+    optimizer = tf.keras.optimizers.Adam()
+    train_loss = tf.keras.metrics.Mean(name='train_loss')
+    train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+    models = [mlp, cnn]
+    for model in models:
+        if isinstance(model,CNN):
+            ds = traincnn
+        else:
+            ds = trainmlp
+
+        train_mod = get_train()
+
+        for epoch in range(ep):
+            # Reset the metrics at the start of the next epoch
+            train_loss.reset_states()
+            train_accuracy.reset_states()
+
+            for x, y, _ in ds:
+                train_mod(x, y, model, optimizer, train_loss, train_accuracy)
+
+            if epoch == 0 or epoch == ep-1:
+                print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+
+    # Train LDA
+    w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+
+    return mlp, cnn, w, c
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c):
     acc = np.empty((3,))
