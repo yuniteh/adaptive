@@ -1,0 +1,11 @@
+*.mat
+*.h5
+*.png
+*.p
+*.DAQ
+*.pyc
+*.csv
+*.fig
+*.PVD
+*.bmp
+figures
