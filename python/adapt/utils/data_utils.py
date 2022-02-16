@@ -109,9 +109,8 @@ def prep_train_caps(x_train, params, prop_b = True):
     y_train = p_train[:,0]
     y_train_lda = y_train[...,np.newaxis] - 1
     x_train_lda = extract_feats_caps(x_train)
-    x_train_aug = extract_feats_caps(x_train_noise)
 
-    return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, x_train_aug, emg_scale, scaler, x_min, x_max, prop
+    return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
 def prep_test_caps(x, params, scaler, emg_scale):
     x, p_test = shuffle(x, params, random_state = 0)
