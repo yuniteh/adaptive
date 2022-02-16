@@ -4,9 +4,9 @@ from tensorflow.keras import Model
 import numpy as np
 
 ## Encoders
-class MLPenc_beta(Model):
+class MLPenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
-        super(MLPenc_beta, self).__init__(name=name)
+        super(MLPenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
         self.bn1 = BatchNormalization()
         self.dense2 = Dense(128, activation='relu')
@@ -67,10 +67,10 @@ class PROP(Model):
     def call(self, x):
         return self.dense1(x)
 
-class MLPbeta(Model):
+class MLP(Model):
     def __init__(self, n_class=7):
-        super(MLPbeta, self).__init__()
-        self.enc = MLPenc_beta()
+        super(MLP, self).__init__()
+        self.enc = MLPenc()
         self.clf = CLF(n_class)
     
     def call(self, x):
@@ -80,7 +80,7 @@ class MLPbeta(Model):
 class MLPprop(Model):
     def __init__(self, n_class=7, n_prop=1):
         super(MLPprop, self).__init__()
-        self.enc = MLPenc_beta()
+        self.enc = MLPenc()
         self.clf = CLF(n_class)
         self.prop = PROP(n_prop)
     
