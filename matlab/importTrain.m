@@ -172,7 +172,7 @@ for subs = 1:iter
             cl_list = unique(cl_all);
             cl_count = zeros(length(cl_list),1);
             data_all = cell(length(cl_all),1);
-            params = NaN(length(cl_all),2);
+            params = NaN(length(cl_all),3);
             
             for i_DAQSubfolderFile=1:numfiles(1)
                 clearvars -except win inc cl_all cl_list cl_count data_all params iter DAQfilenames MATfilenames subjectpath DAQpath MATpath save_override_check UserName numfiles iDAQFile i_DAQSubfolderFile DAQ_subfolder_path MAT_subfolder_path DAQ_subfolder_filenames MAT_subfolder_filenames;
@@ -215,11 +215,12 @@ for subs = 1:iter
                     data_all{i_DAQSubfolderFile} = daq.DAQ_DATA(end-2999:end,:);
                     params(i_DAQSubfolderFile,1) = find(cl_list==cl);
                     params(i_DAQSubfolderFile,2) = cl_count(cl_list == cl);
+                    params(i_DAQSubfolderFile,3) = cl;
                 end
             end
             
             data_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),size(data_all{1},2),win);
-            params_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),2);
+            params_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),3);
             
             trial_i = 1;
             for trial=1:length(data_all)
