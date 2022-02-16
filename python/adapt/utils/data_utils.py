@@ -111,9 +111,9 @@ def prep_train_caps(x_train, params, prop_b = True):
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
-def prep_test_caps(x, params, scaler, emg_scale):
+def prep_test_caps(x, params, scaler, emg_scale, num_classes=None):
     x, p_test = shuffle(x, params, random_state = 0)
-    y = to_categorical(p_test[:,0]-1)
+    y = to_categorical(p_test[:,0]-1,num_classes=num_classes)
 
     x *= emg_scale
 
