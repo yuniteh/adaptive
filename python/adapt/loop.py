@@ -67,9 +67,6 @@ def check_labels(test_data,test_params,train_dof,key):
     test_key = np.empty(test_dof.shape)
     for dof_i in range(len(test_dof)):
         test_key[dof_i] = test_params[np.argmax(test_params[:,2] == test_dof[dof_i]),0]
-    
-    test_dof = test_dof[np.argsort(test_key)]
-    test_key = np.sort(test_key)
 
     if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
         if len(test_dof) < len(train_dof):
