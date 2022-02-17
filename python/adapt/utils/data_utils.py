@@ -67,7 +67,7 @@ def truncate(data):
     data[data < -5] = -5
     return data
 
-def prep_train_caps(x_train, params, prop_b=True, num_classes=None):
+def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
     emg_scale = np.ones((np.size(x_train,1),1))
@@ -76,7 +76,9 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None):
     x_train *= emg_scale
 
     x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
-
+    if not noise:
+        x_train_noise = cp.deepcopy(x_train_clean)
+        
     # shuffle data to make even batches
     x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
 
@@ -102,8 +104,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None):
     x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
 
     # create batches
-    trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean, prop)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(128)
-    traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(128)
+    trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean, prop)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(batch_size)
+    traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(batch_size)
 
     # LDA data
     y_train = p_train[:,0]
