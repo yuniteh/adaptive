@@ -3,10 +3,12 @@ import tensorflow as tf
 from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test
 from adapt.ml.lda import train_lda, eval_lda
 
-def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30):
+def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None):
     # Train NNs
-    mlp = MLP(n_class=n_dof)
-    cnn = CNN(n_class=n_dof)
+    if mlp == None:
+        mlp = MLP(n_class=n_dof)
+    if cnn == None:
+        cnn = CNN(n_class=n_dof)
 
     optimizer = tf.keras.optimizers.Adam()
     train_loss = tf.keras.metrics.Mean(name='train_loss')
