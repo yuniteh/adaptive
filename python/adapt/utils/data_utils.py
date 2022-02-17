@@ -67,12 +67,13 @@ def truncate(data):
     data[data < -5] = -5
     return data
 
-def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True):
+def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
-    emg_scale = np.ones((np.size(x_train,1),1))
-    for i in range(np.size(x_train,1)):
-        emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
+    if emg_scale is not np.ndarray:
+        emg_scale = np.ones((np.size(x_train,1),1))
+        for i in range(np.size(x_train,1)):
+            emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
     x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
@@ -96,8 +97,12 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         prop = np.empty((y_train_clean.shape))
 
     # Extract features
-    scaler = MinMaxScaler(feature_range=(0,1))
-    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=False,ft='feat',caps=True) 
+    if scaler is not MinMaxScaler:
+        scaler = MinMaxScaler(feature_range=(0,1))
+        load = False
+    else:
+        load = True
+    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft='feat',caps=True) 
     x_train_noise_cnn = x_train_noise_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
