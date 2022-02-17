@@ -2,9 +2,6 @@ from sklearn.preprocessing import MinMaxScaler
 
 class Sess():
     def __init__(self,**settings):
-        self.sub_type = settings.get('sub_type','AB')
-        self.sub = settings.get('sub',1)
-
         self.train_grp = settings.get('train_grp',2)
         self.train_scale = settings.get('train_scale',5)
         self.train = settings.get('train','fullallmix4')

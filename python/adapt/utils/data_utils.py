@@ -13,6 +13,8 @@ from sklearn.preprocessing import MinMaxScaler
 from itertools import combinations, product
 import pickle
 import tensorflow as tf
+from adapt.ml.dl_subclass import get_test
+from adapt.ml.lda import eval_lda
 
 def load_raw(filename):
     struct = scipy.io.loadmat(filename)
@@ -65,7 +67,7 @@ def truncate(data):
     data[data < -5] = -5
     return data
 
-def prep_train_caps(x_train, params, prop_b = True):
+def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
     emg_scale = np.ones((np.size(x_train,1),1))
@@ -73,8 +75,10 @@ def prep_train_caps(x_train, params, prop_b = True):
         emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-    x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train)
-
+    x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
+    if not noise:
+        x_train_noise = cp.deepcopy(x_train_clean)
+        
     # shuffle data to make even batches
     x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
 
@@ -90,7 +94,6 @@ def prep_train_caps(x_train, params, prop_b = True):
         prop[y_train_clean.astype(bool)] = prop_temp[y_train_clean.astype(bool)]
     else:
         prop = np.empty((y_train_clean.shape))
-    
 
     # Extract features
     scaler = MinMaxScaler(feature_range=(0,1))
@@ -101,8 +104,8 @@ def prep_train_caps(x_train, params, prop_b = True):
     x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
 
     # create batches
-    trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean, prop)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(128)
-    traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(128)
+    trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean, prop)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(batch_size)
+    traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(batch_size)
 
     # LDA data
     y_train = p_train[:,0]
@@ -111,9 +114,9 @@ def prep_train_caps(x_train, params, prop_b = True):
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
-def prep_test_caps(x, params, scaler, emg_scale):
+def prep_test_caps(x, params, scaler, emg_scale, num_classes=None):
     x, p_test = shuffle(x, params, random_state = 0)
-    y = to_categorical(p_test[:,0]-1)
+    y = to_categorical(p_test[:,0]-1,num_classes=num_classes)
 
     x *= emg_scale
 
@@ -133,119 +136,7 @@ def prep_test_caps(x, params, scaler, emg_scale):
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
-def prep_train_data(d, raw, params):
-    x_train, _, x_valid, p_train, _, p_valid = train_data_split(raw,params,d.sub,d.sub_type,dt=d.cv_type,load=True,train_grp=d.train_grp)
-
-    emg_scale = np.ones((np.size(x_train,1),1))
-    for i in range(np.size(x_train,1)):
-        emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
-    x_train = x_train*emg_scale
-    x_valid = x_valid*emg_scale
-
-    x_train_noise, _, y_train_clean = add_noise(x_train, p_train, d.sub, d.train, d.train_scale)
-    x_valid_noise, _, y_valid_clean = add_noise(x_valid, p_valid, d.sub, d.train, d.train_scale)
-
-    # shuffle data to make even batches
-    x_train_noise, y_train_clean = shuffle(x_train_noise, y_train_clean, random_state = 0)
-
-    # Extract features
-    scaler = MinMaxScaler(feature_range=(0,1))
-    x_train_noise_cnn, scaler = extract_scale(x_train_noise,scaler,d.scaler_load,ft=d.feat_type,emg_scale=emg_scale) 
-    x_valid_noise_cnn, _ = extract_scale(x_valid_noise,scaler,ft=d.feat_type,emg_scale=emg_scale)
-    x_train_noise_cnn = x_train_noise_cnn.astype('float32')
-    x_valid_noise_cnn = x_valid_noise_cnn.astype('float32')
-
-    # reshape data for nonconvolutional network
-    x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
-    x_valid_noise_mlp = x_valid_noise_cnn.reshape(x_valid_noise_cnn.shape[0],-1)
-
-    # create batches
-    trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(128)
-    validmlp = tf.data.Dataset.from_tensor_slices((x_valid_noise_mlp, y_valid_clean)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(128)
-    traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(128)
-    validcnn = tf.data.Dataset.from_tensor_slices((x_valid_noise_cnn, y_valid_clean)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(128)
-
-    d.emg_scale = emg_scale
-    d.scaler = scaler
-
-    # LDA data
-    y_train = p_train[:,4]
-    y_train_lda = y_train[...,np.newaxis] - 1
-    x_train_lda = extract_feats(x_train,ft=d.feat_type,emg_scale=emg_scale)
-    x_train_aug = extract_feats(x_train_noise,ft=d.feat_type,emg_scale=emg_scale)
-
-    return trainmlp, validmlp, traincnn, validcnn, y_train_clean, y_valid_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, x_train_aug
-
-def prep_test_data(d,raw,params,real_noise_temp):
-    _, x_test, _, _, p_test, _ = train_data_split(raw,params,d.sub,d.sub_type,dt=d.cv_type,train_grp=d.test_grp)
-    clean_size = int(np.size(x_test,axis=0))
-    x_test = x_test*d.emg_scale
-
-    x_test_noise, _, y_test_clean = add_noise(x_test, p_test, d.sub, d.test, 1, real_noise=real_noise_temp, emg_scale = d.emg_scale)
-    x_test_cnn, _ = extract_scale(x_test_noise,d.scaler,ft=d.feat_type,emg_scale=d.emg_scale)
-    x_test_cnn = x_test_cnn.astype('float32')
-    x_test_mlp = x_test_cnn.reshape(x_test_cnn.shape[0],-1)
-
-    x_test_lda = extract_feats(x_test_noise,ft=d.feat_type,emg_scale=d.emg_scale)
-
-    return x_test_cnn, x_test_mlp, x_test_lda, y_test_clean, clean_size
-
-def train_data_split(raw, params, sub, sub_type, dt=0, train_grp=2, load=True, test_i = 5, valid_i = 5):
-    if dt == 0:
-        today = date.today()
-        dt = today.strftime("%m%d")
-    # foldername = 'models' + '_' + str(train_grp) + '_' + dt
-    foldername = 'traindata_' + dt
-    filename = foldername + '/' + sub_type + str(sub) + '_traindata_' + str(train_grp)  + '.p'
-    if not os.path.isdir(foldername):
-        os.mkdir(foldername)
-    
-    if load:
-        if os.path.isfile(filename):
-            print('Loading training data: ' + filename)
-            with open(filename,'rb') as f:
-                x_train, x_test, x_valid, p_train, p_test, p_valid = pickle.load(f)
-        else:
-            load=False
-    if not load:
-        ind = (params[:,0] == sub) & (params[:,3] == train_grp)
-        if train_grp > 2:
-            x_train, x_valid, p_train, p_valid = 0,0,0,0
-            x_test, p_test = raw[ind,:,:], params[ind,:] 
-        else:
-            if dt == 'cv':
-                train_ind = ind & (params[:,6] != test_i)
-                test_ind = ind & (params[:,6] == test_i)
-                x_train, p_train = raw[train_ind,:,:], params[train_ind,:]
-                x_valid, p_valid = raw[train_ind,:,:], params[train_ind,:]
-                x_test, p_test = raw[test_ind,:,:], params[test_ind,:]
-            elif dt == 'manual':
-                train_ind = ind & (params[:,6] != test_i)
-                valid_ind = ind & (params[:,6] == valid_i)
-                test_ind = ind & (params[:,6] == test_i)
-                x_train, p_train = raw[train_ind,:,:], params[train_ind,:]
-                x_valid, p_valid = raw[valid_ind,:,:], params[valid_ind,:]
-                x_test, p_test = raw[test_ind,:,:], params[test_ind,:]
-            elif dt == 'all':
-                valid_ind = ind & (params[:,6] == valid_i)
-                x_train, p_train = raw[ind,:,:], params[ind,:]
-                x_valid, p_valid = raw[valid_ind,:,:], params[valid_ind,:]
-                x_test, p_test = raw[valid_ind,:,:], params[valid_ind,:]
-            else:
-                # Split training and testing data
-                x_temp, x_test, p_temp, p_test = train_test_split(raw[ind,:,:], params[ind,:], test_size = 0.2, stratify=params[ind,4], shuffle=True)
-                x_train, x_valid, p_train, p_valid = train_test_split(x_temp, p_temp, test_size = 0.33, stratify=p_temp[:,4], shuffle=True)
-        
-        with open(filename, 'wb') as f:
-            pickle.dump([x_train, x_test, x_valid, p_train, p_test, p_valid],f)
-
-    if train_grp < 3:
-        x_train, p_train = shuffle(x_train, p_train, random_state = 0)
-        x_valid, p_valid = shuffle(x_valid, p_valid, random_state = 0)
-    x_test, p_test = shuffle(x_test, p_test, random_state = 0)
-    return x_train, x_test, x_valid, p_train, p_test, p_valid
-
-def add_noise_caps(raw, params):
+def add_noise_caps(raw, params,num_classes=None):
     all_ch = raw.shape[1]
     num_ch = 4
     split = 6
@@ -308,7 +199,7 @@ def add_noise_caps(raw, params):
     
     out = np.concatenate((raw, out))
 
-    noisy, clean, y = out, orig, to_categorical(sub_params[:,0]-1)
+    noisy, clean, y = out, orig, to_categorical(sub_params[:,0]-1,num_classes=num_classes)
 
     clean = clean[...,np.newaxis]
     noisy = noisy[...,np.newaxis]
