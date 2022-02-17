@@ -67,7 +67,7 @@ def truncate(data):
     data[data < -5] = -5
     return data
 
-def prep_train_caps(x_train, params, prop_b = True):
+def prep_train_caps(x_train, params, prop_b=True, num_classes=None):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
     emg_scale = np.ones((np.size(x_train,1),1))
@@ -75,7 +75,7 @@ def prep_train_caps(x_train, params, prop_b = True):
         emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-    x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train)
+    x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
 
     # shuffle data to make even batches
     x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
@@ -134,7 +134,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None):
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
-def add_noise_caps(raw, params):
+def add_noise_caps(raw, params,num_classes=None):
     all_ch = raw.shape[1]
     num_ch = 4
     split = 6
@@ -197,7 +197,7 @@ def add_noise_caps(raw, params):
     
     out = np.concatenate((raw, out))
 
-    noisy, clean, y = out, orig, to_categorical(sub_params[:,0]-1)
+    noisy, clean, y = out, orig, to_categorical(sub_params[:,0]-1,num_classes=num_classes)
 
     clean = clean[...,np.newaxis]
     noisy = noisy[...,np.newaxis]

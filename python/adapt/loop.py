@@ -3,7 +3,7 @@ import tensorflow as tf
 from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test
 from adapt.ml.lda import train_lda, eval_lda
 
-def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None):
+def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False):
     # Train NNs
     if mlp == None:
         mlp = MLP(n_class=n_dof)
@@ -30,8 +30,9 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
             for x, y, _ in ds:
                 train_mod(x, y, model, optimizer, train_loss, train_accuracy)
 
-            if epoch == 0 or epoch == ep-1:
-                print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+            if print_b:
+                if epoch == 0 or epoch == ep-1:
+                    print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
 
     # Train LDA
     w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
@@ -69,7 +70,7 @@ def check_labels(test_data,test_params,train_dof,key):
     test_key = np.empty(test_dof.shape)
     for dof_i in range(len(test_dof)):
         test_key[dof_i] = test_params[np.argmax(test_params[:,2] == test_dof[dof_i]),0]
-
+        
     if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
         if len(test_dof) < len(train_dof):
             print('Missing classes')
