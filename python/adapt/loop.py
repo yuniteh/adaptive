@@ -49,7 +49,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c):
     # test CNN
     test_mod = get_test()
     test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy)
-    acc[0] = test_accuracy.result()*100
+    acc[2] = test_accuracy.result()*100
 
     # test MLP
     test_loss.reset_states()
@@ -60,7 +60,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c):
     acc[1] = test_accuracy.result()*100
 
     # test LDA
-    acc[2] = eval_lda(w, c, x_lda, y_lda) * 100
+    acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
 
     return acc
 
