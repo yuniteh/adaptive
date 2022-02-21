@@ -95,22 +95,6 @@ class ALI(Model):
             x = tf.reshape(x,in_shape)
         return x
 
-# class ALIconv(Model):
-#     def __init__(self, c1=32, c2=32, name='aligner'):
-#         super(ALIconv, self).__init__(name=name)
-#         self.dense1 = Dense(12, activation='relu')
-#         self.bn1 = BatchNormalization()
-#         self.dense2 = Dense(n, activation='relu')
-
-#         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
-#         self.bn1 = BatchNormalization()
-#         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
-
-#     def call(self,x):
-#         x = self.dense1(x)
-#         x = self.bn1(x)
-#         return self.dense2(x)
-
 ## Full models
 class MLPprop(Model):
     def __init__(self, n_class=7, n_prop=1):
