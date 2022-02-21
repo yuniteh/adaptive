@@ -67,7 +67,7 @@ def truncate(data):
     data[data < -5] = -5
     return data
 
-def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None):
+def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None,ft='feat'):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
     if emg_scale is not np.ndarray:
@@ -102,7 +102,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         load = False
     else:
         load = True
-    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft='feat',caps=True) 
+    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True) 
     x_train_noise_cnn = x_train_noise_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
@@ -115,11 +115,11 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # LDA data
     y_train = p_train[:,0]
     y_train_lda = y_train[...,np.newaxis] - 1
-    x_train_lda = extract_feats_caps(x_train)
+    x_train_lda = extract_feats_caps(x_train,ft=ft)
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
-def prep_test_caps(x, params, scaler, emg_scale, num_classes=None):
+def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
     x, p_test = shuffle(x, params, random_state = 0)
     y = to_categorical(p_test[:,0]-1,num_classes=num_classes)
 
@@ -129,7 +129,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None):
     x_test, y_test = shuffle(x, y, random_state = 0)
 
     # Extract features
-    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,True,ft='feat',caps=True) 
+    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,True,ft=ft,caps=True) 
     x_test_cnn = x_test_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
@@ -435,12 +435,14 @@ def add_noise(raw, params, n_type='flat', scale=5, real_noise=0,emg_scale=[1,1,1
     clean = truncate(clean)
     return noisy,clean,y
 
-def extract_feats_caps(raw,ft='feat',uint=False):
+def extract_feats_caps(raw,ft='feat',uint=False,order=6):
     # raw format (samps x chan x win)
     if raw.shape[-1] == 1:
         raw = np.squeeze(raw)
     N = raw.shape[2]
     ch = raw.shape[1]
+    samp = raw.shape[0]
+
     if uint:
         z_th = 164
         s_th = 99
@@ -469,6 +471,13 @@ def extract_feats_caps(raw,ft='feat',uint=False):
         wl = np.sum(np.abs(next - raw_demean[...,:-1]), axis=2)
 
         feat_out = np.concatenate([mav,wl,zc,ssc],-1)
+
+        if ft == 'tdar':
+            AR = np.zeros((samp,raw.shape[1],order))
+            for ch in range(raw.shape[1]):
+                AR[:,ch,:] = np.squeeze(matAR_ch(raw[:,ch,:],order))
+            reg_out = np.real(AR.transpose(0,2,1)).reshape((samp,-1))
+            feat_out = np.hstack([feat_out,reg_out])
     else:
         feat_out = mav
     feat_out = feat_out/200
