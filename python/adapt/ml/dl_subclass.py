@@ -144,23 +144,19 @@ def bias_variable(shape):
     return tf.Variable(initial)
 
 class EWC(Model):
-    def __init__(self, x, y_, n_class=7):
+    def __init__(self):
         super(EWC, self).__init__()
         self.enc = MLPenc()
-        self.clf = CLF(n_class)
+        self.clf = CLF()
 
-        self.x = x # input placeholder
-        self.y = self.call(x)
+        # self.x = x # input placeholder
+        # self.y = self.call(x)
 
-        self.var_list = self.get_weights()
+        # self.set_weights(w)
 
-        # vanilla single-task loss
-        self.cross_entropy =  tf.keras.losses.categorical_crossentropy(self.y,y_)
-        self.set_vanilla_loss()
-
-        # performance metrics
-        correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y_,1))
-        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        # self.var_list = self.get_weights()
+        # # vanilla single-task loss
+        # self.cross_entropy =  tf.keras.losses.categorical_crossentropy(self.y,y_)
     
     def call(self, x):
         x = self.enc(x)
@@ -192,12 +188,40 @@ class EWC(Model):
         for v in range(len(self.F_accum)):
             self.F_accum[v] /= num_samples
 
-    def star(self):
-        # used for saving optimal weights after most recent task training
-        self.star_vars = []
+    def compute_diag_fim(self, x_data, fim_samples=200):
+        '''
+            compute diagonal fisher information matrix
+        '''
+        FIM = []
+        for ii in range(len(self.trainable_weights)):
+            FIM.append(np.zeros(self.trainable_weights[ii].shape))
+        # -- set-up graph nodes--
+        # true fisher information: use predicted label
+        # get gradients wrt log likelihood
+        
+        # -- compute FIM (expected squared score of ll) --
+        for i in range(fim_samples):
+            idx = np.random.randint(x_data.shape[0])
+            with tf.GradientTape() as tape:
+                self.y = self.call(x_data[idx:idx+1,:])
+                c_index = tf.argmax(self.y,1)[0]
+                loss = tf.math.log(self.y[0,c_index])
+            grads = tape.gradient(loss,self.trainable_weights)
+            # add squared gradients of score:
+            for ii in range(len(self.trainable_weights)):
+                FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
+        # normalise:
+        self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
 
-        for v in range(len(self.var_list)):
-            self.star_vars.append(self.var_list[v].eval())
+    def star(self,mod=None):
+        # used for saving optimal weights after most recent task training
+        self.set_weights(mod.get_weights())
+        self.star_vars = []
+        for i in range(len(mod.trainable_weights)):
+            self.star_vars.append(np.zeros(self.trainable_weights[i].shape))
+            self.star_vars[i] = mod.trainable_weights[i].numpy()
+        # for i in range(len(self.star_vars)):
+        #     self.star_vars[i] = mod.trainable_weights[i].numpy()
 
     def restore(self, sess):
         # reassign optimal weights for latest task
@@ -205,8 +229,6 @@ class EWC(Model):
             for v in range(len(self.var_list)):
                 sess.run(self.var_list[v].assign(self.star_vars[v]))
 
-    def set_vanilla_loss(self):
-        self.train_step = tf.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
 
     def update_ewc_loss(self, lam):
         # elastic weight consolidation
@@ -230,9 +252,7 @@ def get_train_ewc():
     @tf.function
     def train_step(x, y, mod, optimizer, train_loss, train_accuracy, ewc=True, lams = 0):
         with tf.GradientTape() as tape:
-            if(lams == 0):
-                mod.set_vanilla_loss()
-            else:
+            if(lams != 0):
                 mod.update_ewc_loss(lams)
             if ewc:
                 y_out = mod(x,training=True)
