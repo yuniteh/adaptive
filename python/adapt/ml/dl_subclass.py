@@ -139,6 +139,7 @@ class EWC(Model):
         super(EWC, self).__init__()
         self.dense1 = Dense(50,activation='relu')
         self.dense2 = Dense(n_class,activation='softmax')
+
         # self.enc = MLPenc()
         # self.clf = CLF(n_class)
     
@@ -211,7 +212,7 @@ class EWC(Model):
 
     def star(self,mod=None):
         # used for saving optimal weights after most recent task training
-        self.set_weights(mod.get_weights())
+        # self.set_weights(mod.get_weights())
         self.star_vars = []
         for i in range(len(mod.trainable_weights)):
             self.star_vars.append(np.zeros(self.trainable_weights[i].shape))
@@ -257,15 +258,15 @@ def get_train_ewc():
         with tf.GradientTape() as tape:
             y_out = mod(x,training=True)
             loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            for v in range(len(mod.trainable_weights)):
-                loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+            # class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            # for v in range(len(mod.trainable_weights)):
+            #     loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
         # print(train_loss(loss).result())
         gradients = tape.gradient(loss,mod.trainable_weights)
         optimizer.apply_gradients(zip(gradients, mod.trainable_weights))
 
         train_loss(loss)
-        train_loss2(class_loss)
+        # train_loss2(class_loss)
         train_accuracy(y, y_out)
     
     return train_step
