@@ -137,12 +137,14 @@ class CNNprop(Model):
 class EWC(Model):
     def __init__(self,n_class=7):
         super(EWC, self).__init__()
-        self.enc = MLPenc()
-        self.clf = CLF(n_class)
+        self.dense1 = Dense(50,activation='relu')
+        self.dense2 = Dense(n_class,activation='softmax')
+        # self.enc = MLPenc()
+        # self.clf = CLF(n_class)
     
     def call(self, x):
-        x = self.enc(x)
-        return self.clf(x)
+        x = self.dense1(x)
+        return self.dense2(x)
 
     # def compute_diag_fim(self, x_data):
     #     self.fim_samples = 200
@@ -205,8 +207,7 @@ class EWC(Model):
             for ii in range(len(self.trainable_weights)):
                 FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
         # normalise:
-        # self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
-        self.FIM = FIM
+        self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
 
     def star(self,mod=None):
         # used for saving optimal weights after most recent task training
@@ -242,8 +243,8 @@ def get_fish():
         with tf.GradientTape() as tape:
             y_out = mod(x)
             c_index = tf.argmax(y_out,1)[0]
-            # loss = tf.math.log(y_out[0,c_index])
-            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            loss = tf.math.log(y_out[0,c_index])
+            # loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients

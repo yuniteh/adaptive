@@ -1,12 +1,13 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test
+from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test,EWC
 from adapt.ml.lda import train_lda, eval_lda
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
     if mlp == None:
-        mlp = MLP(n_class=n_dof)
+        # mlp = MLP(n_class=n_dof)
+        mlp = EWC(n_class=n_dof)
     if cnn == None:
         cnn = CNN(n_class=n_dof)
     if align == True:
