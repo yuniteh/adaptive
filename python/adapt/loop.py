@@ -47,7 +47,11 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
                     print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
 
     # Train LDA
-    w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+    if isinstance(x_train_lda,np.ndarray):
+        w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+    else:
+        w=0
+        c=0
 
     # print(align)
     if align:
