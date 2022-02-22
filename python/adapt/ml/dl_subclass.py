@@ -134,61 +134,17 @@ class CNNprop(Model):
         prop = self.prop(x)
         return y, prop
 
-# variable initialization functions
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
-
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
-
 class EWC(Model):
     def __init__(self):
         super(EWC, self).__init__()
         self.enc = MLPenc()
         self.clf = CLF()
-
-        # self.x = x # input placeholder
-        # self.y = self.call(x)
-
-        # self.set_weights(w)
-
-        # self.var_list = self.get_weights()
-        # # vanilla single-task loss
-        # self.cross_entropy =  tf.keras.losses.categorical_crossentropy(self.y,y_)
     
     def call(self, x):
         x = self.enc(x)
         return self.clf(x)
 
-    def compute_fisher(self, imgset, sess, num_samples=200):
-        # computer Fisher information for each parameter
-
-        # initialize Fisher information for most recent task
-        self.F_accum = []
-        for v in range(len(self.var_list)):
-            self.F_accum.append(np.zeros(self.var_list[v].get_shape().as_list()))
-
-        # sampling a random class from softmax
-        probs = tf.nn.softmax(self.y)
-        class_ind = tf.to_int32(tf.multinomial(tf.log(probs), 1)[0][0])
-
-        fish_gra = tf.gradients(tf.log(probs[0,class_ind]), self.var_list)
-        for i in range(num_samples):
-            # select random input image
-            im_ind = np.random.randint(imgset.shape[0])
-            # compute first-order derivatives
-            ders = sess.run(fish_gra, feed_dict={self.x: imgset[im_ind:im_ind+1]})
-            # square the derivatives and add to total
-            for v in range(len(self.F_accum)):
-                self.F_accum[v] += np.square(ders[v])
-
-        # divide totals by number of samples
-        for v in range(len(self.F_accum)):
-            self.F_accum[v] /= num_samples
-
-    def compute_diag_fim(self, x_data, fim_samples=200):
+    def compute_diag_fim(self, x_data, fim_samples=1000):
         '''
             compute diagonal fisher information matrix
         '''
@@ -223,13 +179,6 @@ class EWC(Model):
         # for i in range(len(self.star_vars)):
         #     self.star_vars[i] = mod.trainable_weights[i].numpy()
 
-    def restore(self, sess):
-        # reassign optimal weights for latest task
-        if hasattr(self, "star_vars"):
-            for v in range(len(self.var_list)):
-                sess.run(self.var_list[v].assign(self.star_vars[v]))
-
-
     def update_ewc_loss(self, lam):
         # elastic weight consolidation
         # lam is weighting for previous task(s) constraints
@@ -250,21 +199,21 @@ def eval_nn(x, y, mod, clean):
 ## TRAIN TEST MLP
 def get_train_ewc():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, ewc=True, lams = 0):
+    def train_step(x, y, mod, optimizer, train_loss, train_loss2, train_accuracy, lam = 0):
         with tf.GradientTape() as tape:
-            if(lams != 0):
-                mod.update_ewc_loss(lams)
-            if ewc:
-                y_out = mod(x,training=True)
-                loss = mod.set_vanilla_loss
-            else:
-                y_out = mod(x,training=True)
-                loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            
-        gradients = tape.gradient(loss, mod.trainable_variables)
+            y_out = mod(x,training=True)
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            for v in range(len(mod.trainable_variables)):
+                # print(v)
+                # print(tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v]))))
+                loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+        # print(train_loss(loss).result())
+        gradients = tape.gradient(loss,mod.trainable_weights)
         optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
 
         train_loss(loss)
+        train_loss2(class_loss)
         train_accuracy(y, y_out)
     
     return train_step
