@@ -135,16 +135,40 @@ class CNNprop(Model):
         return y, prop
 
 class EWC(Model):
-    def __init__(self):
+    def __init__(self,n_class=7):
         super(EWC, self).__init__()
         self.enc = MLPenc()
-        self.clf = CLF()
+        self.clf = CLF(n_class)
     
     def call(self, x):
         x = self.enc(x)
         return self.clf(x)
 
-    def compute_diag_fim(self, x_data, fim_samples=1000):
+    # def compute_diag_fim(self, x_data):
+    #     self.fim_samples = 200
+    #     FIM = []
+    #     for ii in range(len(self.thetas)):
+    #         FIM.append(np.zeros(self.thetas[ii].get_shape().as_list()))
+    #     # -- set-up graph nodes--
+    #     # true fisher information: use predicted label
+    #     if self.n_classes > 0:
+    #         c_index = tf.argmax(self.y_pred,1)[0]
+    #     else:
+    #         c_index = 0
+    #     # get gradients wrt log likelihood
+    #     compute_gradients = tf.gradients(tf.math.log(self.y_pred[0,c_index]),self.thetas)
+        
+    #     # -- compute FIM (expected squared score of ll) --
+    #     for ii in range(self.fim_samples):
+    #         idx = np.random.randint(x_data.shape[0])
+    #         grads = self.sess.run(compute_gradients, feed_dict={self.x_features:x_data[idx:idx+1,:]})
+    #         # add squared gradients of score:
+    #         for ii in range(len(self.thetas)):
+    #             FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
+    #         # normalise:
+    #         self.FIM  = [FIM[ii]/self.fim_samples for ii in range(len(self.thetas))]
+
+    def compute_diag_fim(self, x_data, y, fim_samples=500):
         '''
             compute diagonal fisher information matrix
         '''
@@ -154,20 +178,35 @@ class EWC(Model):
         # -- set-up graph nodes--
         # true fisher information: use predicted label
         # get gradients wrt log likelihood
+
+        # compute_gradients = tf.gradients(tf.math.log(self.y_pred[0,c_index]),self.thetas)
         
+        # # -- compute FIM (expected squared score of ll) --
+        # for i in range(self.fim_samples):
+        #     idx = np.random.randint(x_data.shape[0])
+        #     grads = self.sess.run(compute_gradients, feed_dict={self.x_features:x_data[idx:idx+1,:]})
+        #     # add squared gradients of score:
+        #     for ii in range(len(self.thetas)):
+        #         FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
+        # # normalise:
+        # self.FIM  = [FIM[ii]/self.fim_samples for ii in range(len(self.thetas))]
+        fish = get_fish()
         # -- compute FIM (expected squared score of ll) --
         for i in range(fim_samples):
             idx = np.random.randint(x_data.shape[0])
-            with tf.GradientTape() as tape:
-                self.y = self.call(x_data[idx:idx+1,:])
-                c_index = tf.argmax(self.y,1)[0]
-                loss = tf.math.log(self.y[0,c_index])
-            grads = tape.gradient(loss,self.trainable_weights)
+            grads = fish(x_data[idx:idx+1,...],y[idx:idx+1,...], self)
+
+            # with tf.GradientTape() as tape:
+            #     self.y = self.call(x_data[idx:idx+1,:])
+            #     c_index = tf.argmax(self.y,1)[0]
+            #     loss = tf.math.log(self.y[0,c_index])
+            # grads = tape.gradient(loss,self.trainable_weights)
             # add squared gradients of score:
             for ii in range(len(self.trainable_weights)):
                 FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
         # normalise:
-        self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
+        # self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
+        self.FIM = FIM
 
     def star(self,mod=None):
         # used for saving optimal weights after most recent task training
@@ -197,6 +236,20 @@ def eval_nn(x, y, mod, clean):
     return clean_acc, noise_acc
 
 ## TRAIN TEST MLP
+def get_fish():
+    @tf.function
+    def train_fish(x, y, mod):
+        with tf.GradientTape() as tape:
+            y_out = mod(x)
+            c_index = tf.argmax(y_out,1)[0]
+            # loss = tf.math.log(y_out[0,c_index])
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+
+        gradients = tape.gradient(loss,mod.trainable_weights)
+        return gradients
+    
+    return train_fish
+
 def get_train_ewc():
     @tf.function
     def train_step(x, y, mod, optimizer, train_loss, train_loss2, train_accuracy, lam = 0):
@@ -204,13 +257,11 @@ def get_train_ewc():
             y_out = mod(x,training=True)
             loss = tf.keras.losses.categorical_crossentropy(y,y_out)
             class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            for v in range(len(mod.trainable_variables)):
-                # print(v)
-                # print(tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v]))))
+            for v in range(len(mod.trainable_weights)):
                 loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
         # print(train_loss(loss).result())
         gradients = tape.gradient(loss,mod.trainable_weights)
-        optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+        optimizer.apply_gradients(zip(gradients, mod.trainable_weights))
 
         train_loss(loss)
         train_loss2(class_loss)

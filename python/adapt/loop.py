@@ -19,7 +19,7 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-    models = [mlp, cnn]
+    models = [mlp]
     for model in models:
         if isinstance(model,CNN):
             ds = traincnn
