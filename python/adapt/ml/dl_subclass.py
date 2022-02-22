@@ -3,6 +3,8 @@ from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization
 from tensorflow.keras import Model
 import numpy as np
 import copy as cp
+import matplotlib.pyplot as plt
+from IPython import display
 
 ## Encoders
 class MLPenc(Model):
@@ -53,9 +55,9 @@ class CNNenc(Model):
 
 ## Classifier
 class CLF(Model):
-    def __init__(self, n_class=7, name='clf'):
+    def __init__(self, n_class=7, act='softmax', name='clf'):
         super(CLF, self).__init__(name=name)
-        self.dense1 = Dense(n_class, activation='softmax')
+        self.dense1 = Dense(n_class, activation=act)
 
     def call(self, x):
         return self.dense1(x)
@@ -135,101 +137,86 @@ class CNNprop(Model):
         return y, prop
 
 class EWC(Model):
-    def __init__(self,n_class=7):
+    def __init__(self, n_class=7):
         super(EWC, self).__init__()
-        self.dense1 = Dense(50,activation='relu')
-        self.dense2 = Dense(n_class,activation='softmax')
-
-        # self.enc = MLPenc()
-        # self.clf = CLF(n_class)
+        self.enc = MLPenc()
+        self.clf = CLF(n_class=n_class, act = None)
+    
+    def acc(self, x, y):
+        self.y = self.call(x)
+        correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y,1))
+        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        return self.accuracy
     
     def call(self, x):
-        x = self.dense1(x)
-        return self.dense2(x)
+        x = self.enc(x)
+        return self.clf(x)
 
-    # def compute_diag_fim(self, x_data):
-    #     self.fim_samples = 200
-    #     FIM = []
-    #     for ii in range(len(self.thetas)):
-    #         FIM.append(np.zeros(self.thetas[ii].get_shape().as_list()))
-    #     # -- set-up graph nodes--
-    #     # true fisher information: use predicted label
-    #     if self.n_classes > 0:
-    #         c_index = tf.argmax(self.y_pred,1)[0]
-    #     else:
-    #         c_index = 0
-    #     # get gradients wrt log likelihood
-    #     compute_gradients = tf.gradients(tf.math.log(self.y_pred[0,c_index]),self.thetas)
+    def compute_fisher(self, imgset, num_samples=200, plot_diffs=False, disp_freq=10):
+        # computer Fisher information for each parameter
+        # initialize Fisher information for most recent task
+        self.F_accum = []
+        for v in range(len(self.trainable_weights)):
+            self.F_accum.append(np.zeros(self.trainable_weights[v].get_shape().as_list()))
+
+
+        if(plot_diffs):
+            # track differences in mean Fisher info
+            F_prev = cp.deepcopy(self.F_accum)
+            mean_diffs = np.zeros(0)
+
+        fish_gra = get_fish()
+        for i in range(num_samples):
+            # select random input image
+            im_ind = np.random.randint(imgset.shape[0])
+            # compute first-order derivatives
+            ders = fish_gra(imgset[im_ind:im_ind+1],self)
+            # square the derivatives and add to total
+            for v in range(len(self.F_accum)):
+                self.F_accum[v] += np.square(ders[v])
+            if(plot_diffs):
+                if i % disp_freq == 0 and i > 0:
+                    # recording mean diffs of F
+                    F_diff = 0
+                    for v in range(len(self.F_accum)):
+                        F_diff += np.sum(np.absolute(self.F_accum[v]/(i+1) - F_prev[v]))
+                    mean_diff = np.mean(F_diff)
+                    mean_diffs = np.append(mean_diffs, mean_diff)
+                    for v in range(len(self.F_accum)):
+                        F_prev[v] = self.F_accum[v]/(i+1)
+
+        plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
+        plt.xlabel("Number of samples")
+        plt.ylabel("Mean absolute Fisher difference")
+        display.display(plt.gcf())
+        display.clear_output(wait=True)
+
+        # divide totals by number of samples
+        for v in range(len(self.F_accum)):
+            self.F_accum[v] /= num_samples
         
-    #     # -- compute FIM (expected squared score of ll) --
-    #     for ii in range(self.fim_samples):
-    #         idx = np.random.randint(x_data.shape[0])
-    #         grads = self.sess.run(compute_gradients, feed_dict={self.x_features:x_data[idx:idx+1,:]})
-    #         # add squared gradients of score:
-    #         for ii in range(len(self.thetas)):
-    #             FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
-    #         # normalise:
-    #         self.FIM  = [FIM[ii]/self.fim_samples for ii in range(len(self.thetas))]
+        if not hasattr(self,"F_old"):
+            self.F_old = cp.deepcopy(self.F_accum)
+            self.int = 1
+        else:  
+            self.int += 1
+            for v in range(len(self.F_accum)):
+                self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/self.int
+            self.F_old = cp.deepcopy(self.F_accum)
 
-    def compute_diag_fim(self, x_data, y, fim_samples=500):
-        '''
-            compute diagonal fisher information matrix
-        '''
-        FIM = []
-        for ii in range(len(self.trainable_weights)):
-            FIM.append(np.zeros(self.trainable_weights[ii].shape))
-        # -- set-up graph nodes--
-        # true fisher information: use predicted label
-        # get gradients wrt log likelihood
 
-        # compute_gradients = tf.gradients(tf.math.log(self.y_pred[0,c_index]),self.thetas)
-        
-        # # -- compute FIM (expected squared score of ll) --
-        # for i in range(self.fim_samples):
-        #     idx = np.random.randint(x_data.shape[0])
-        #     grads = self.sess.run(compute_gradients, feed_dict={self.x_features:x_data[idx:idx+1,:]})
-        #     # add squared gradients of score:
-        #     for ii in range(len(self.thetas)):
-        #         FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
-        # # normalise:
-        # self.FIM  = [FIM[ii]/self.fim_samples for ii in range(len(self.thetas))]
-        fish = get_fish()
-        # -- compute FIM (expected squared score of ll) --
-        for i in range(fim_samples):
-            idx = np.random.randint(x_data.shape[0])
-            grads = fish(x_data[idx:idx+1,...],y[idx:idx+1,...], self)
-
-            # with tf.GradientTape() as tape:
-            #     self.y = self.call(x_data[idx:idx+1,:])
-            #     c_index = tf.argmax(self.y,1)[0]
-            #     loss = tf.math.log(self.y[0,c_index])
-            # grads = tape.gradient(loss,self.trainable_weights)
-            # add squared gradients of score:
-            for ii in range(len(self.trainable_weights)):
-                FIM[ii] +=  grads[ii]**2 # np.square(grads[ii])
-        # normalise:
-        self.FIM  = [FIM[ii]/fim_samples for ii in range(len(self.trainable_weights))]
-
-    def star(self,mod=None):
+    def star(self):
         # used for saving optimal weights after most recent task training
-        # self.set_weights(mod.get_weights())
         self.star_vars = []
-        for i in range(len(mod.trainable_weights)):
-            self.star_vars.append(np.zeros(self.trainable_weights[i].shape))
-            self.star_vars[i] = mod.trainable_weights[i].numpy()
-        # for i in range(len(self.star_vars)):
-        #     self.star_vars[i] = mod.trainable_weights[i].numpy()
 
-    def update_ewc_loss(self, lam):
-        # elastic weight consolidation
-        # lam is weighting for previous task(s) constraints
+        for v in range(len(self.trainable_weights)):
+            self.star_vars.append(cp.deepcopy(self.trainable_weights[v].numpy()))
 
-        if not hasattr(self, "ewc_loss"):
-            self.ewc_loss = self.cross_entropy
-
-        for v in range(len(self.var_list)):
-            self.ewc_loss += (lam/2) * tf.reduce_sum(tf.multiply(self.F_accum[v].astype(np.float32),tf.square(self.var_list[v] - self.star_vars[v])))
-
+    def restore(self):
+        # reassign optimal weights for latest task
+        if hasattr(self, "star_vars"):
+            for v in range(len(self.trainable_weights)):
+                self.trainable_weights[v].assign(self.star_vars[v])
 
 def eval_nn(x, y, mod, clean):
     y_pred = np.argmax(mod(x).numpy(),axis=1)
@@ -240,33 +227,29 @@ def eval_nn(x, y, mod, clean):
 ## TRAIN TEST MLP
 def get_fish():
     @tf.function
-    def train_fish(x, y, mod):
+    def train_fish(x, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x)
+            y_out = tf.nn.softmax(mod(x,training=True))
             c_index = tf.argmax(y_out,1)[0]
             loss = tf.math.log(y_out[0,c_index])
-            # loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients
-    
     return train_fish
 
 def get_train_ewc():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss, train_loss2, train_accuracy, lam = 0):
+    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, lam = 0):
         with tf.GradientTape() as tape:
             y_out = mod(x,training=True)
-            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            # class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            # for v in range(len(mod.trainable_weights)):
-            #     loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.FIM[v],tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-        # print(train_loss(loss).result())
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits=True)
+            if hasattr(mod, "F_accum"):
+                for v in range(len(mod.trainable_weights)):
+                    loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
         gradients = tape.gradient(loss,mod.trainable_weights)
         optimizer.apply_gradients(zip(gradients, mod.trainable_weights))
-
+    
         train_loss(loss)
-        # train_loss2(class_loss)
         train_accuracy(y, y_out)
     
     return train_step

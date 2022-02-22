@@ -1,7 +1,63 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test,EWC
+from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC, get_train_ewc, get_fish
 from adapt.ml.lda import train_lda, eval_lda
+import matplotlib.pyplot as plt
+from IPython import display
+
+# classification accuracy plotting
+def plot_test_acc(plot_handles):
+    plt.legend(handles=plot_handles, loc="center right")
+    plt.xlabel("Iterations")
+    plt.ylabel("Test Accuracy")
+    plt.ylim(0,1)
+    display.display(plt.gcf())
+    display.clear_output(wait=True)
+    
+# train/compare vanilla sgd and ewc
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
+    for l in range(len(lams)):
+        # lams[l] sets weight on old task(s)
+        model.restore() # reassign optimal weights from previous training session
+        test_accs = []
+        for task in range(len(x_test)):
+            test_accs.append(np.zeros(int(num_iter/disp_freq)))
+        train_ewc = get_train_ewc()
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+        train_loss = tf.keras.metrics.Mean(name='train_loss')
+        train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+        ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(100)
+        # train on current task
+        train_last = -9999
+        for iter in range(num_iter):
+            for x_in, y_in in ds:
+                train_ewc(x_in, y_in, model, optimizer, train_loss, train_accuracy, lam=lams[l])
+
+            if iter % disp_freq == 0:
+                for task in range(len(x_test)):
+                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
+
+            train_diff = train_loss.result() - train_last
+            train_last = train_loss.result()
+            print(train_diff)
+            if train_diff < 0 and train_diff > -1e-3:
+                break
+
+        plt.subplot(1, len(lams), l+1)
+        colors = ['r', 'b', 'g']
+        plots = []
+        for task in range(len(x_test)):
+            c = chr(ord('A') + task)
+            if disp_freq > iter:
+                disp_freq = 1
+            plot_h, = plt.plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
+            plots.append(plot_h)
+        plot_test_acc(plots)
+        if l == 0: 
+            plt.title("vanilla sgd")
+        else:
+            plt.title("ewc")
+        plt.gcf().set_size_inches(len(lams)*5, 3.5)
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
