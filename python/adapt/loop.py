@@ -1,39 +1,33 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC, get_train_ewc, get_fish
+from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
-from IPython import display
-
-# classification accuracy plotting
-def plot_test_acc(plot_handles):
-    plt.legend(handles=plot_handles, loc="center right")
-    plt.xlabel("Iterations")
-    plt.ylabel("Test Accuracy")
-    plt.ylim(0,1.2)
-    # display.display(plt.gcf())
-    # display.clear_output(wait=True)
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
+    fig, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
     for l in range(len(lams)):
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
 
         test_accs = []
+        loss = np.zeros(int(num_iter/disp_freq)+1)
+        f_loss = np.zeros(int(num_iter/disp_freq)+1)
+        train_accs = np.zeros(int(num_iter/disp_freq)+1)
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
 
-        
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
         
         # train functions
         train_ewc = get_train()
         train_loss = tf.keras.metrics.Mean(name='train_loss')
+        fish_loss = tf.keras.metrics.Mean(name='fish_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
 
         # validation functions
@@ -44,12 +38,23 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_last = 9999
         for task in range(len(x_test)):
             print(f'first: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
+
         for iter in range(num_iter):
             train_loss.reset_states()
+            fish_loss.reset_states()
             train_accuracy.reset_states()
             val_acc.reset_states()
+            
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, train_accuracy, lam=lams[l])
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lams[l])
+                if loss[0] == 0:
+                    loss[0] = train_loss.result()
+                    f_loss[0] = fish_loss.result()
+                    train_accs[0] = train_accuracy.result()
+
+            loss[int(iter/disp_freq)+1] = train_loss.result()
+            f_loss[int(iter/disp_freq)+1] = fish_loss.result()
+            train_accs[int(iter/disp_freq)+1] = train_accuracy.result()
 
             if iter % disp_freq == 0:
                 for task in range(len(x_test)):
@@ -63,22 +68,35 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 break
         
         # plot results
-        plt.subplot(1, len(lams), l+1)
         colors = ['r', 'b', 'g']
-        plots = []
+        if disp_freq > iter:
+            disp_freq = 1
+
+        ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2], 'r-', label="class loss")
+        if np.sum(f_loss) > 0:
+            ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2], 'b-', label="fish loss")
+        ax[l,0].legend(loc="center right")
+        ax[l,0].set_xlabel("Iterations")
+        ax[l,0].set_ylabel("Loss")
+
+        ax[l,1].plot(range(0,iter+1,disp_freq), train_accs[:iter+1], 'b-')
+        ax[l,1].set_xlabel("Iterations")
+        ax[l,1].set_ylabel("Train Accuracy")
+        ax[l,1].set_ylim((0,1.1))
+
         for task in range(len(x_test)):
             c = chr(ord('A') + task)
-            if disp_freq > iter:
-                disp_freq = 1
-            plot_h, = plt.plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
-            plots.append(plot_h)
+            ax[l,2].plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
             print(f'Acc: {test_accs[task][iter]:.4f}')
-        plot_test_acc(plots)
-        if l == 0: 
-            plt.title("vanilla sgd")
+        ax[l,2].legend(loc="center right")
+        ax[l,2].set_xlabel("Iterations")
+        ax[l,2].set_ylabel("Valid Accuracy")
+        ax[l,2].set_ylim((0,1.1))
+
+        if l == 0:
+            ax[l,1].set_title('Vanilla MLP')
         else:
-            plt.title("ewc")
-        plt.gcf().set_size_inches(len(lams)*5, 3.5)
+            ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs

@@ -241,7 +241,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -258,6 +258,7 @@ def get_train():
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
+                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))   
                         loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))                    
             
         gradients = tape.gradient(loss, mod.trainable_variables)
@@ -265,6 +266,8 @@ def get_train():
 
         if train_loss is not None:
             train_loss(loss)
+        if fish_loss is not None and hasattr(mod,"F_accum"):
+            fish_loss(f_loss)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:
@@ -277,14 +280,12 @@ def get_test():
     def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
         if align is not None:
             y_out = mod(align(x))
-        elif isinstance(mod, EWC):
-            y_out = tf.nn.softmax(mod(x))
         else:
             y_out = mod(x)
-        t_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+        loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         if test_loss is not None:
-            test_loss(t_loss)
+            test_loss(loss)
         if test_accuracy is not None:
             test_accuracy(y, y_out)
     
