@@ -1,12 +1,82 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test
+from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC, get_train_ewc, get_fish
 from adapt.ml.lda import train_lda, eval_lda
+import matplotlib.pyplot as plt
+from IPython import display
+
+# classification accuracy plotting
+def plot_test_acc(plot_handles):
+    plt.legend(handles=plot_handles, loc="center right")
+    plt.xlabel("Iterations")
+    plt.ylabel("Test Accuracy")
+    plt.ylim(0,1.2)
+    # display.display(plt.gcf())
+    # display.clear_output(wait=True)
+    
+# train/compare vanilla sgd and ewc
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
+    for l in range(len(lams)):
+        # lams[l] sets weight on old task(s)
+        model.restore() # reassign optimal weights from previous training session
+        test_accs = []
+        for task in range(len(x_test)):
+            test_accs.append(np.zeros(int(num_iter/disp_freq)))
+        train_ewc = get_train_ewc()
+        if lams[l] == 0:
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+        else:
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+        train_loss = tf.keras.metrics.Mean(name='train_loss')
+        train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+        ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
+
+        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        test_mod = get_test()
+        # train on current task
+        train_last = -9999
+        for task in range(len(x_test)):
+            print(f'first: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
+        for iter in range(num_iter):
+            train_loss.reset_states()
+            train_accuracy.reset_states()
+            val_acc.reset_states()
+            for x_in, y_in in ds:
+                train_ewc(x_in, y_in, model, optimizer, train_loss, train_accuracy, lam=lams[l])
+
+            if iter % disp_freq == 0:
+                for task in range(len(x_test)):
+                    # test_accs[task][int(iter/disp_freq)] = model.
+                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
+
+            train_diff = train_loss.result() - train_last
+            train_last = train_loss.result()
+            # print(train_diff)
+            if train_diff < 0 and train_diff > -1e-4:
+                break
+
+        plt.subplot(1, len(lams), l+1)
+        colors = ['r', 'b', 'g']
+        plots = []
+        for task in range(len(x_test)):
+            c = chr(ord('A') + task)
+            if disp_freq > iter:
+                disp_freq = 1
+            plot_h, = plt.plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
+            plots.append(plot_h)
+            print(f'Acc: {test_accs[task][iter]:.4f}')
+        plot_test_acc(plots)
+        if l == 0: 
+            plt.title("vanilla sgd")
+        else:
+            plt.title("ewc")
+        plt.gcf().set_size_inches(len(lams)*5, 3.5)
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
     if mlp == None:
         mlp = MLP(n_class=n_dof)
+        # mlp = EWC(n_class=n_dof)
     if cnn == None:
         cnn = CNN(n_class=n_dof)
     if align == True:
@@ -19,7 +89,7 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-    models = [mlp, cnn]
+    models = [mlp,cnn]
     for model in models:
         if isinstance(model,CNN):
             ds = traincnn
@@ -47,7 +117,11 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
                     print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
 
     # Train LDA
-    w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+    if isinstance(x_train_lda,np.ndarray):
+        w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+    else:
+        w=0
+        c=0
 
     # print(align)
     if align:
@@ -75,8 +149,13 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c, cn
     test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
     acc[1] = test_accuracy.result()*100
 
+    test_loss.reset_states()
+    test_accuracy.reset_states()
+    test_mod = get_test()
+    test_mod(x_test_mlp, y_test, w, test_loss, test_accuracy, align=mlp_align)
+    acc[0] = test_accuracy.result()*100
     # test LDA
-    acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+    # acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
 
     return acc
 
