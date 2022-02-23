@@ -234,28 +234,10 @@ def get_fish():
             y_out = mod(x,training=True)
             c_index = tf.argmax(y_out,1)[0]
             loss = tf.math.log(y_out[0,c_index])
-            # loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits=True)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients
     return train_fish
-
-def get_train_ewc():
-    @tf.function
-    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, lam = 0):
-        with tf.GradientTape() as tape:
-            y_out = mod(x,training=True)
-            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-            if hasattr(mod, "F_accum"):
-                for v in range(len(mod.trainable_weights)):
-                    loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-        gradients = tape.gradient(loss,mod.trainable_weights)
-        optimizer.apply_gradients(zip(gradients, mod.trainable_weights))
-    
-        train_loss(loss)
-        train_accuracy(y, y_out)
-    
-    return train_step
 
 def get_train():
     @tf.function
