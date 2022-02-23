@@ -141,15 +141,15 @@ class EWC(Model):
     def __init__(self, n_class=7):
         super(EWC, self).__init__()
         self.enc = MLPenc()
-        self.clf = CLF(n_class=n_class, act = None)
+        self.clf = CLF(n_class=n_class, act = 'softmax')
     
     def acc(self, x, y, val_acc=None):
-        y_out = tf.nn.softmax(self.call(x))
-        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
-        accuracy = val_acc(y, y_out)
-        # correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y,1))
-        # self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        return accuracy
+        # y_out = tf.nn.softmax(self.call(x))
+        y_out = self.call(x)
+        if val_acc is None:
+            val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        val_acc(y, y_out)
+        return val_acc.result()
     
     def call(self, x):
         x = self.enc(x)
@@ -232,7 +232,8 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = tf.nn.softmax(mod(x,training=True))
+            # y_out = tf.nn.softmax(mod(x,training=True))
+            y_out = mod(x,training=True)
             c_index = tf.argmax(y_out,1)[0]
             loss = tf.math.log(y_out[0,c_index])
             # loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits=True)
@@ -245,7 +246,8 @@ def get_train_ewc():
     @tf.function
     def train_step(x, y, mod, optimizer, train_loss, train_accuracy, lam = 0):
         with tf.GradientTape() as tape:
-            y_out = tf.nn.softmax(mod(x,training=True))
+            # y_out = tf.nn.softmax(mod(x,training=True))
+            y_out = mod(x,training=True)
             loss = tf.keras.losses.categorical_crossentropy(y,y_out)
             if hasattr(mod, "F_accum"):
                 for v in range(len(mod.trainable_weights)):
@@ -258,14 +260,14 @@ def get_train_ewc():
     
     return train_step
 
-def get_train(prop=False):
+def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, train_prop_accuracy=None, y_prop=None, align=None):
+    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-                prop_loss = tf.keras.losses.mean_squared_error(y_prop, prop_out)
+                prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             else:
                 if align is not None:
@@ -273,7 +275,11 @@ def get_train(prop=False):
                 else:
                     y_out = mod(x,training=True)
                 if isinstance(mod, EWC):
-                    loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits =True)
+                    y_out = tf.nn.softmax(y_out)
+                    loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+                    if hasattr(mod, "F_accum"):
+                        for v in range(len(mod.trainable_weights)):
+                            loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                 else:
                     loss = tf.keras.losses.categorical_crossentropy(y,y_out)
             
