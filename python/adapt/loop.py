@@ -24,9 +24,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
         train_ewc = get_train_ewc()
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
         else:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
@@ -36,7 +36,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         # train on current task
         train_last = -9999
         for task in range(len(x_test)):
-            print(f'first: {model.acc(x=x_test[task], y = y_test[task],val_acc= val_acc):.4f}')
+            print(f'first: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
         for iter in range(num_iter):
             train_loss.reset_states()
             train_accuracy.reset_states()
@@ -47,12 +47,12 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             if iter % disp_freq == 0:
                 for task in range(len(x_test)):
                     # test_accs[task][int(iter/disp_freq)] = model.
-                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task],val_acc= val_acc)
+                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
 
             train_diff = train_loss.result() - train_last
             train_last = train_loss.result()
             # print(train_diff)
-            if train_diff < 0 and train_diff > -1e-3:
+            if train_diff < 0 and train_diff > -1e-4:
                 break
 
         plt.subplot(1, len(lams), l+1)
@@ -75,8 +75,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
     if mlp == None:
-        # mlp = MLP(n_class=n_dof)
-        mlp = EWC(n_class=n_dof)
+        mlp = MLP(n_class=n_dof)
+        # mlp = EWC(n_class=n_dof)
     if cnn == None:
         cnn = CNN(n_class=n_dof)
     if align == True:
@@ -146,9 +146,14 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c, cn
     test_accuracy.reset_states()
 
     test_mod = get_test()
-    test_mod(x_test_mlp, y_lda, mlp, test_loss, test_accuracy, align=mlp_align)
+    test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
     acc[1] = test_accuracy.result()*100
 
+    test_loss.reset_states()
+    test_accuracy.reset_states()
+    test_mod = get_test()
+    test_mod(x_test_mlp, y_test, w, test_loss, test_accuracy, align=mlp_align)
+    acc[0] = test_accuracy.result()*100
     # test LDA
     # acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
 

@@ -143,9 +143,9 @@ class EWC(Model):
         self.enc = MLPenc()
         self.clf = CLF(n_class=n_class, act = None)
     
-    def acc(self, x, y, val_acc):
+    def acc(self, x, y, val_acc=None):
         y_out = tf.nn.softmax(self.call(x))
-        # val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
         accuracy = val_acc(y, y_out)
         # correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y,1))
         # self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -155,7 +155,7 @@ class EWC(Model):
         x = self.enc(x)
         return self.clf(x)
 
-    def compute_fisher(self, imgset, num_samples=200, plot_diffs=False, disp_freq=10):
+    def compute_fisher(self, imgset, y, num_samples=200, plot_diffs=False, disp_freq=10):
         # computer Fisher information for each parameter
         # initialize Fisher information for most recent task
         self.F_accum = []
@@ -173,7 +173,7 @@ class EWC(Model):
             # select random input image
             im_ind = np.random.randint(imgset.shape[0])
             # compute first-order derivatives
-            ders = fish_gra(imgset[im_ind:im_ind+1],self)
+            ders = fish_gra(imgset[im_ind:im_ind+1],y[im_ind:im_ind+1],self)
             # square the derivatives and add to total
             for v in range(len(self.F_accum)):
                 self.F_accum[v] += np.square(ders[v])
@@ -230,11 +230,12 @@ def eval_nn(x, y, mod, clean):
 ## TRAIN TEST MLP
 def get_fish():
     @tf.function
-    def train_fish(x, mod):
+    def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
             y_out = tf.nn.softmax(mod(x,training=True))
             c_index = tf.argmax(y_out,1)[0]
             loss = tf.math.log(y_out[0,c_index])
+            # loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits=True)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients

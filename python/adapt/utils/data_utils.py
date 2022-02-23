@@ -133,7 +133,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
     x_test, y_test = shuffle(x, y, random_state = 0)
 
     # Extract features
-    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,True,ft=ft,caps=True) 
+    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,load=True,ft=ft,caps=True) 
     x_test_cnn = x_test_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
