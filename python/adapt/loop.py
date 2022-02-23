@@ -17,7 +17,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         f_loss = np.zeros(int(num_iter/disp_freq)+1)
         train_accs = np.zeros(int(num_iter/disp_freq)+1)
         for task in range(len(x_test)):
-            test_accs.append(np.zeros(int(num_iter/disp_freq)))
+            test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
 
         if lams[l] == 0:
             optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
@@ -31,42 +31,56 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
 
         # validation functions
-        val_mod = get_test()
-        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
         
-        # train on current task
-        train_last = 9999
+        # initial loss and accuracies
+        train_accs[0] = train_accuracy(model(x_train),y_train)
+        print(f'Initial train acc: {train_accs[0]:.4f},', end=' ')
         for task in range(len(x_test)):
-            print(f'Initial val acc {task:d}: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
+            test_accs[task][0] = val_accuracy(model(x_test[task]),y_test[task])
 
+            if task != len(x_test)-1:
+                end_p = ', '
+            else:
+                end_p = '\n'
+            print(f'val acc {task:d}: {test_accs[task][0]:.4f}', end = end_p)
+
+        train_last = 9999
+
+        # train on current task
         for iter in range(num_iter):
             train_loss.reset_states()
             fish_loss.reset_states()
             train_accuracy.reset_states()
-            val_acc.reset_states()
+            val_accuracy.reset_states()
             
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lams[l])
                 if loss[0] == 0:
                     loss[0] = train_loss.result()
                     f_loss[0] = fish_loss.result()
-                    train_accs[0] = train_accuracy.result()
-                    print(f'Initial train acc: {train_accs[0]:.4f}')
-
-            loss[int(iter/disp_freq)+1] = train_loss.result()
-            f_loss[int(iter/disp_freq)+1] = fish_loss.result()
-            train_accs[int(iter/disp_freq)+1] = train_accuracy.result()
 
             if iter % disp_freq == 0:
+                loss[int(iter/disp_freq)+1] = train_loss.result()
+                f_loss[int(iter/disp_freq)+1] = fish_loss.result()
+                train_accs[int(iter/disp_freq)+1] = train_accuracy.result()
                 for task in range(len(x_test)):
-                    val_mod(x_test[task], y_test[task], model, test_accuracy=val_acc)
-                    test_accs[task][int(iter/disp_freq)] = val_acc.result()
+                    # val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+                    test_accs[task][int(iter/disp_freq)+1] = val_accuracy(model(x_test[task]),y_test[task])
 
             # early stopping criteria
             train_diff = train_last - train_loss.result()
             train_last = train_loss.result()
             if train_diff > 0 and train_diff < 1e-4:
                 break
+        
+        print(f'Final train acc: {train_accs[iter+1]:.4f}, ', end=' '),
+        for task in range(len(x_test)):       
+            if task != len(x_test)-1:
+                end_p = ', '
+            else:
+                end_p = '\n'
+            print(f'val acc {task:d}: {test_accs[task][iter+1]:.4f}', end=end_p)
         
         # plot results
         colors = ['r', 'b', 'g']
@@ -79,31 +93,29 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         ax[l,0].legend(loc="center right")
         ax[l,0].set_ylabel("Loss")
 
-        ax[l,1].plot(range(0,iter+1,disp_freq), train_accs[:iter+1], 'b-')
+        ax[l,1].plot(range(0,iter+2,disp_freq), train_accs[:iter+2], 'b-')
         ax[l,1].set_ylabel("Train Accuracy")
         ax[l,1].set_ylim((0,1.1))
 
         for task in range(len(x_test)):
             c = chr(ord('A') + task)
-            ax[l,2].plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
-            print(f'Final val acc {task:d}: {test_accs[task][iter]:.4f}')
+            ax[l,2].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + c)
         ax[l,2].legend(loc="center right")
         ax[l,2].set_ylabel("Valid Accuracy")
         ax[l,2].set_ylim((0,1.1))
-
-        print(f'Final train acc: {train_accs[iter]:.4f}')
 
         if l == 0:
             ax[l,1].set_title('Vanilla MLP')
         else:
             ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
 
-        if l == len(lams)-1:
-            for i in range(3):
+        for i in range(3):
+            if l == len(lams)-1:
                 ax[l,i].set_xlabel("Iterations")
-        else:
-            for i in range(3):
+            else:
                 ax[l,i].get_xaxis().set_visible(False)
+    
+    return loss, f_loss
 
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
