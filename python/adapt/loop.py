@@ -37,7 +37,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         # train on current task
         train_last = 9999
         for task in range(len(x_test)):
-            print(f'first: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
+            print(f'Initial val acc {task:d}: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
 
         for iter in range(num_iter):
             train_loss.reset_states()
@@ -51,6 +51,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                     loss[0] = train_loss.result()
                     f_loss[0] = fish_loss.result()
                     train_accs[0] = train_accuracy.result()
+                    print(f'Initial train acc: {train_accs[0]:.4f}')
 
             loss[int(iter/disp_freq)+1] = train_loss.result()
             f_loss[int(iter/disp_freq)+1] = fish_loss.result()
@@ -76,27 +77,34 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         if np.sum(f_loss) > 0:
             ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2], 'b-', label="fish loss")
         ax[l,0].legend(loc="center right")
-        ax[l,0].set_xlabel("Iterations")
         ax[l,0].set_ylabel("Loss")
 
         ax[l,1].plot(range(0,iter+1,disp_freq), train_accs[:iter+1], 'b-')
-        ax[l,1].set_xlabel("Iterations")
         ax[l,1].set_ylabel("Train Accuracy")
         ax[l,1].set_ylim((0,1.1))
 
         for task in range(len(x_test)):
             c = chr(ord('A') + task)
             ax[l,2].plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
-            print(f'Acc: {test_accs[task][iter]:.4f}')
+            print(f'Final val acc {task:d}: {test_accs[task][iter]:.4f}')
         ax[l,2].legend(loc="center right")
-        ax[l,2].set_xlabel("Iterations")
         ax[l,2].set_ylabel("Valid Accuracy")
         ax[l,2].set_ylim((0,1.1))
+
+        print(f'Final train acc: {train_accs[iter]:.4f}')
 
         if l == 0:
             ax[l,1].set_title('Vanilla MLP')
         else:
             ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
+
+        if l == len(lams)-1:
+            for i in range(3):
+                ax[l,i].set_xlabel("Iterations")
+        else:
+            for i in range(3):
+                ax[l,i].get_xaxis().set_visible(False)
+
 
 def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
