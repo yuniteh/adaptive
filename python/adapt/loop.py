@@ -23,10 +23,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
         train_ewc = get_train_ewc()
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-        ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(100)
+        ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
         # train on current task
         train_last = -9999
         for iter in range(num_iter):

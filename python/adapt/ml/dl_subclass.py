@@ -11,23 +11,24 @@ class MLPenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(MLPenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
-        self.bn1 = BatchNormalization()
+        # self.bn1 = BatchNormalization()
         self.dense2 = Dense(128, activation='relu')
-        self.bn2 = BatchNormalization()
+        # self.bn2 = BatchNormalization()
         self.dense3 = Dense(16, activation='relu')
-        self.bn3 = BatchNormalization()
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()
+        # self.bn3 = BatchNormalization()
+        # self.latent = Dense(latent_dim)#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        # self.bn4 = BatchNormalization()
 
     def call(self, x):
         x = self.dense1(x)
-        x = self.bn1(x)
+        # x = self.bn1(x)
         x = self.dense2(x)
-        x = self.bn2(x)
+        # x = self.bn2(x)
         x = self.dense3(x)
-        x = self.bn3(x)
-        x = self.latent(x)
-        return self.bn4(x)
+        # x = self.bn3(x)
+        # x = self.latent(x)
+        # x = self.bn4(x)
+        return x
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
