@@ -245,8 +245,8 @@ def get_train_ewc():
     @tf.function
     def train_step(x, y, mod, optimizer, train_loss, train_accuracy, lam = 0):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=True)
-            loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits=True)
+            y_out = tf.nn.softmax(mod(x,training=True))
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
             if hasattr(mod, "F_accum"):
                 for v in range(len(mod.trainable_weights)):
                     loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
@@ -260,7 +260,7 @@ def get_train_ewc():
 
 def get_train(prop=False):
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, train_prop_accuracy=0, y_prop=0, align=None):
+    def train_step(x, y, mod, optimizer, train_loss, train_accuracy, train_prop_accuracy=None, y_prop=None, align=None):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -268,7 +268,7 @@ def get_train(prop=False):
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop, prop_out)
                 loss = class_loss + prop_loss/10
             else:
-                if isinstance(align,ALI):
+                if align is not None:
                     y_out = mod(align(x,training=True),training=False)
                 else:
                     y_out = mod(x,training=True)
@@ -282,15 +282,15 @@ def get_train(prop=False):
 
         train_loss(loss)
         train_accuracy(y, y_out)
-        if prop:
+        if train_prop_accuracy is not None:
             train_prop_accuracy(y_prop, prop_out)
     
     return train_step
 
 def get_test():
     @tf.function
-    def test_step(x, y, mod, test_loss, test_accuracy,align=None):
-        if isinstance(align,ALI):
+    def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
+        if align is not None:
             y_out = mod(align(x))
         elif isinstance(mod, EWC):
             y_out = tf.nn.softmax(mod(x))
@@ -298,7 +298,9 @@ def get_test():
             y_out = mod(x)
         t_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
-        test_loss(t_loss)
-        test_accuracy(y, y_out)
+        if test_loss is not None:
+            test_loss(t_loss)
+        if test_accuracy is not None:
+            test_accuracy(y, y_out)
     
     return test_step

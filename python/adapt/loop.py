@@ -32,7 +32,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
 
         val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
-        test_mod = get_test()
+        val_mod = get_test()
         # train on current task
         train_last = -9999
         for task in range(len(x_test)):
@@ -46,12 +46,12 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
 
             if iter % disp_freq == 0:
                 for task in range(len(x_test)):
-                    # test_accs[task][int(iter/disp_freq)] = model.
-                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
+                    val_mod(x_test[task], y_test[task], model, test_accuracy=val_acc)
+                    test_accs[task][int(iter/disp_freq)] = val_acc.result()
+                    # test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
 
             train_diff = train_loss.result() - train_last
             train_last = train_loss.result()
-            # print(train_diff)
             if train_diff < 0 and train_diff > -1e-4:
                 break
 
@@ -149,13 +149,14 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c, cn
     test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
     acc[1] = test_accuracy.result()*100
 
-    test_loss.reset_states()
-    test_accuracy.reset_states()
-    test_mod = get_test()
-    test_mod(x_test_mlp, y_test, w, test_loss, test_accuracy, align=mlp_align)
-    acc[0] = test_accuracy.result()*100
-    # test LDA
-    # acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+    # test_loss.reset_states()
+    # test_accuracy.reset_states()
+    # test_mod = get_test()
+    # test_mod(x_test_mlp, y_test, w, test_loss, test_accuracy, align=mlp_align)
+    # acc[0] = test_accuracy.result()*100
+
+    #test LDA
+    acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
 
     return acc
 
