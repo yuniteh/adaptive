@@ -11,8 +11,8 @@ def plot_test_acc(plot_handles):
     plt.xlabel("Iterations")
     plt.ylabel("Test Accuracy")
     plt.ylim(0,1)
-    display.display(plt.gcf())
-    display.clear_output(wait=True)
+    # display.display(plt.gcf())
+    # display.clear_output(wait=True)
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
@@ -23,7 +23,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
         train_ewc = get_train_ewc()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
@@ -52,6 +52,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 disp_freq = 1
             plot_h, = plt.plot(range(0,iter+1,disp_freq), test_accs[task][:iter+1], colors[task], label="task " + c)
             plots.append(plot_h)
+            print(f'Acc: {test_accs[task][iter]:.4f}')
         plot_test_acc(plots)
         if l == 0: 
             plt.title("vanilla sgd")
