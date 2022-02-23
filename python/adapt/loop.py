@@ -10,7 +10,7 @@ def plot_test_acc(plot_handles):
     plt.legend(handles=plot_handles, loc="center right")
     plt.xlabel("Iterations")
     plt.ylabel("Test Accuracy")
-    plt.ylim(0,1)
+    plt.ylim(0,1.2)
     # display.display(plt.gcf())
     # display.clear_output(wait=True)
     
@@ -23,23 +23,35 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
         train_ewc = get_train_ewc()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        if lams[l] == 0:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        else:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
+
+        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        test_mod = get_test()
         # train on current task
         train_last = -9999
+        for task in range(len(x_test)):
+            print(f'first: {model.acc(x=x_test[task], y = y_test[task],val_acc= val_acc):.4f}')
         for iter in range(num_iter):
+            train_loss.reset_states()
+            train_accuracy.reset_states()
+            val_acc.reset_states()
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, train_accuracy, lam=lams[l])
 
             if iter % disp_freq == 0:
                 for task in range(len(x_test)):
-                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
+                    # test_accs[task][int(iter/disp_freq)] = model.
+                    test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task],val_acc= val_acc)
 
             train_diff = train_loss.result() - train_last
             train_last = train_loss.result()
-            print(train_diff)
+            # print(train_diff)
             if train_diff < 0 and train_diff > -1e-3:
                 break
 
@@ -77,7 +89,7 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-    models = [mlp]
+    models = [mlp,cnn]
     for model in models:
         if isinstance(model,CNN):
             ds = traincnn
@@ -134,11 +146,11 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c, cn
     test_accuracy.reset_states()
 
     test_mod = get_test()
-    test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
+    test_mod(x_test_mlp, y_lda, mlp, test_loss, test_accuracy, align=mlp_align)
     acc[1] = test_accuracy.result()*100
 
     # test LDA
-    acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+    # acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
 
     return acc
 

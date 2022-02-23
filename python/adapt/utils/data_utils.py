@@ -70,18 +70,21 @@ def truncate(data):
 def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None,ft='feat'):
     x_train, p_train = shuffle(x_train, params, random_state = 0)
     
-    if emg_scale is not np.ndarray:
+    if not isinstance(emg_scale,np.ndarray):
         emg_scale = np.ones((np.size(x_train,1),1))
         for i in range(np.size(x_train,1)):
             emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-    x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
-    if not noise:
-        x_train_noise = cp.deepcopy(x_train_clean)
-        
-    # shuffle data to make even batches
-    x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
+    if noise:
+        x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
+            
+        # shuffle data to make even batches
+        x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
+    else:
+        y = to_categorical(p_train[:,0]-1,num_classes=num_classes)
+        x_train_noise, y_train_clean = shuffle(x_train,y,random_state=0)
+        x_train_clean = cp.deepcopy(x_train_noise)
 
     # calculate class MAV
     if prop_b:
@@ -97,11 +100,12 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         prop = np.empty((y_train_clean.shape))
 
     # Extract features
-    if scaler is not MinMaxScaler:
+    if isinstance(scaler,MinMaxScaler):
+        load = True
+    else:
         scaler = MinMaxScaler(feature_range=(0,1))
         load = False
-    else:
-        load = True
+        
     x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True) 
     x_train_noise_cnn = x_train_noise_cnn.astype('float32')
 

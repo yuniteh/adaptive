@@ -16,7 +16,7 @@ class MLPenc(Model):
         # self.bn2 = BatchNormalization()
         self.dense3 = Dense(16, activation='relu')
         # self.bn3 = BatchNormalization()
-        # self.latent = Dense(latent_dim)#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         # self.bn4 = BatchNormalization()
 
     def call(self, x):
@@ -26,7 +26,7 @@ class MLPenc(Model):
         # x = self.bn2(x)
         x = self.dense3(x)
         # x = self.bn3(x)
-        # x = self.latent(x)
+        x = self.latent(x)
         # x = self.bn4(x)
         return x
 
@@ -143,11 +143,13 @@ class EWC(Model):
         self.enc = MLPenc()
         self.clf = CLF(n_class=n_class, act = None)
     
-    def acc(self, x, y):
-        self.y = self.call(x)
-        correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y,1))
-        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        return self.accuracy
+    def acc(self, x, y, val_acc):
+        y_out = tf.nn.softmax(self.call(x))
+        # val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        accuracy = val_acc(y, y_out)
+        # correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(y,1))
+        # self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        return accuracy
     
     def call(self, x):
         x = self.enc(x)
@@ -269,7 +271,10 @@ def get_train(prop=False):
                     y_out = mod(align(x,training=True),training=False)
                 else:
                     y_out = mod(x,training=True)
-                loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+                if isinstance(mod, EWC):
+                    loss = tf.keras.losses.categorical_crossentropy(y,y_out,from_logits =True)
+                else:
+                    loss = tf.keras.losses.categorical_crossentropy(y,y_out)
             
         gradients = tape.gradient(loss, mod.trainable_variables)
         optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
@@ -286,6 +291,8 @@ def get_test():
     def test_step(x, y, mod, test_loss, test_accuracy,align=None):
         if isinstance(align,ALI):
             y_out = mod(align(x))
+        elif isinstance(mod, EWC):
+            y_out = tf.nn.softmax(mod(x))
         else:
             y_out = mod(x)
         t_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
