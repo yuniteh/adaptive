@@ -16,25 +16,32 @@ def plot_test_acc(plot_handles):
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
     for l in range(len(lams)):
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
+
         test_accs = []
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)))
-        train_ewc = get_train_ewc()
+
+        
         if lams[l] == 0:
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
         else:
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+        
+        # train functions
+        train_ewc = get_train()
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-        ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
 
-        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        # validation functions
         val_mod = get_test()
+        val_acc = tf.keras.metrics.CategoricalAccuracy(name='val_acc')
+        
         # train on current task
-        train_last = -9999
+        train_last = 9999
         for task in range(len(x_test)):
             print(f'first: {model.acc(x=x_test[task], y = y_test[task]):.4f}')
         for iter in range(num_iter):
@@ -48,13 +55,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 for task in range(len(x_test)):
                     val_mod(x_test[task], y_test[task], model, test_accuracy=val_acc)
                     test_accs[task][int(iter/disp_freq)] = val_acc.result()
-                    # test_accs[task][int(iter/disp_freq)] = model.acc(x=x_test[task], y = y_test[task])
 
-            train_diff = train_loss.result() - train_last
+            # early stopping criteria
+            train_diff = train_last - train_loss.result()
             train_last = train_loss.result()
-            if train_diff < 0 and train_diff > -1e-4:
+            if train_diff > 0 and train_diff < 1e-4:
                 break
-
+        
+        # plot results
         plt.subplot(1, len(lams), l+1)
         colors = ['r', 'b', 'g']
         plots = []
