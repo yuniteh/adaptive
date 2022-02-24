@@ -31,7 +31,7 @@ class MLPenc(Model):
 
 class EWCenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
-        super(MLPenc, self).__init__(name=name)
+        super(EWCenc, self).__init__(name=name)
         self.dense1 = Dense(128, activation='relu')
         # self.bn1 = BatchNormalization()
         self.dense2 = Dense(64, activation='relu')
@@ -166,7 +166,7 @@ class CNNprop(Model):
 class EWC(Model):
     def __init__(self, n_class=7):
         super(EWC, self).__init__()
-        self.enc = MLPenc()
+        self.enc = EWCenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):

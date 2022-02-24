@@ -8,10 +8,13 @@ from sklearn.utils import shuffle
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(100)
-    fig, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
+
+    _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
+    
     loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     lams_all = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
+
     for l in range(len(lams)):
         lam_in = np.abs(lams[l])
         # lams[l] sets weight on old task(s)
@@ -58,19 +61,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             train_accuracy.reset_states()
             val_accuracy.reset_states()
 
-            # x_train, y_train = shuffle(x_train, y_train)
-            # x_in = x_train[:100,...]
-            # y_in = y_train[:100,...]
-
+            ## weight cycling
             # if iter < 10 or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
             #     lam_in = 0
             # else:
             #     lam_in = lams[l]
-            # if iter == 0:
-            #     lam_in = 0
 
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lam_in)
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in)
                 if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
                     f_loss[0,l] = fish_loss.result()
@@ -83,8 +81,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             if iter % disp_freq == 0:
                 loss[int(iter/disp_freq)+1,l] = train_loss.result()
                 f_loss[int(iter/disp_freq)+1,l] = fish_loss.result()
-                train_accuracy(model(x_train),y_train)
-                train_accs[int(iter/disp_freq)+1] = train_accuracy.result()
+                train_accs[int(iter/disp_freq)+1] = train_accuracy(model(x_train),y_train)
                 for task in range(len(x_test)):
                     val_accuracy.reset_states()
                     test_accs[task][int(iter/disp_freq)+1] = val_accuracy(model(x_test[task]),y_test[task])
@@ -143,7 +140,6 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
     # Train NNs
     if mlp == None:
         mlp = MLP(n_class=n_dof)
-        # mlp = EWC(n_class=n_dof)
     if cnn == None:
         cnn = CNN(n_class=n_dof)
     if align == True:
