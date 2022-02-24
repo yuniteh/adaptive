@@ -3,26 +3,29 @@ import tensorflow as tf
 from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
+from sklearn.utils import shuffle
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
-    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(100)
     fig, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
+    loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
+    f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
+    lams_all = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     for l in range(len(lams)):
+        lam_in = np.abs(lams[l])
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
 
         test_accs = []
-        loss = np.zeros(int(num_iter/disp_freq)+1)
-        f_loss = np.zeros(int(num_iter/disp_freq)+1)
         train_accs = np.zeros(int(num_iter/disp_freq)+1)
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
 
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
         else:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
         
         # train functions
         train_ewc = get_train()
@@ -53,19 +56,34 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             fish_loss.reset_states()
             train_accuracy.reset_states()
             val_accuracy.reset_states()
-            
+
+            # x_train, y_train = shuffle(x_train, y_train)
+            # x_in = x_train[:100,...]
+            # y_in = y_train[:100,...]
+
+            if iter < 30:
+                lam_in = lams[l]*2
+            else:
+                lam_in = lams[l]
+
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lams[l])
-                if loss[0] == 0:
-                    loss[0] = train_loss.result()
-                    f_loss[0] = fish_loss.result()
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lam_in)
+                if loss[0,l] == 0:
+                    loss[0,l] = train_loss.result()
+                    f_loss[0,l] = fish_loss.result()
+                
+            if lams[l] < 0 and f_loss[iter,l] != 0:
+                lam_in = np.float32(loss[iter,l]/f_loss[iter,l])
+            
+            lams_all[int(iter/disp_freq)+1,l] = lam_in
 
             if iter % disp_freq == 0:
-                loss[int(iter/disp_freq)+1] = train_loss.result()
-                f_loss[int(iter/disp_freq)+1] = fish_loss.result()
+                loss[int(iter/disp_freq)+1,l] = train_loss.result()
+                f_loss[int(iter/disp_freq)+1,l] = fish_loss.result()
+                train_accuracy(model(x_train),y_train)
                 train_accs[int(iter/disp_freq)+1] = train_accuracy.result()
                 for task in range(len(x_test)):
-                    # val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+                    val_accuracy.reset_states()
                     test_accs[task][int(iter/disp_freq)+1] = val_accuracy(model(x_test[task]),y_test[task])
 
             # early stopping criteria
@@ -87,9 +105,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         if disp_freq > iter:
             disp_freq = 1
 
-        ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2], 'r-', label="class loss")
-        if np.sum(f_loss) > 0:
-            ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2], 'b-', label="fish loss")
+        ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2,l], 'r-', label="class loss")
+        if np.sum(f_loss[:,l]) > 0:
+            ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2,l], 'b-', label="fish loss")
         ax[l,0].legend(loc="center right")
         ax[l,0].set_ylabel("Loss")
 

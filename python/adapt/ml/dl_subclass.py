@@ -10,13 +10,15 @@ from IPython import display
 class MLPenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(MLPenc, self).__init__(name=name)
-        self.dense1 = Dense(246, activation='relu')
+        self.dense1 = Dense(512, activation='relu')
         # self.bn1 = BatchNormalization()
-        self.dense2 = Dense(128, activation='relu')
+        self.dense2 = Dense(256, activation='relu')
         # self.bn2 = BatchNormalization()
-        self.dense3 = Dense(16, activation='relu')
+        self.dense3 = Dense(128, activation='relu')
+        # self.dense4 = Dense(128, activation='relu')
+        # self.dense5 = Dense(128, activation='relu')
         # self.bn3 = BatchNormalization()
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(128, activation='relu')#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         # self.bn4 = BatchNormalization()
 
     def call(self, x):
@@ -26,6 +28,8 @@ class MLPenc(Model):
         # x = self.bn2(x)
         x = self.dense3(x)
         # x = self.bn3(x)
+        # x = self.dense4(x)
+        # x = self.dense5(x)
         x = self.latent(x)
         # x = self.bn4(x)
         return x
