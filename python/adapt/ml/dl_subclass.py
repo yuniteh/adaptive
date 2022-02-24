@@ -10,6 +10,28 @@ from IPython import display
 class MLPenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(MLPenc, self).__init__(name=name)
+        self.dense1 = Dense(246, activation='relu')
+        self.bn1 = BatchNormalization()
+        self.dense2 = Dense(128, activation='relu')
+        self.bn2 = BatchNormalization()
+        self.dense3 = Dense(16, activation='relu')
+        self.bn3 = BatchNormalization()
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn4 = BatchNormalization()
+
+    def call(self, x):
+        x = self.dense1(x)
+        x = self.bn1(x)
+        x = self.dense2(x)
+        x = self.bn2(x)
+        x = self.dense3(x)
+        x = self.bn3(x)
+        x = self.latent(x)
+        return self.bn4(x)
+
+class EWCenc(Model):
+    def __init__(self, latent_dim=4, name='enc'):
+        super(MLPenc, self).__init__(name=name)
         self.dense1 = Dense(128, activation='relu')
         # self.bn1 = BatchNormalization()
         self.dense2 = Dense(64, activation='relu')
@@ -237,10 +259,10 @@ def get_fish():
         with tf.GradientTape() as tape:
             y_out = mod(x,training=True)
             c_index = tf.argmax(y_out,1)[0]
-            # if y is not None:
-            # loss = -tf.math.log(y_out[0,c_index])
-            # else:
-            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            if y is not None:
+                loss = -tf.math.log(y_out[0,c_index])
+            else:
+                loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients
