@@ -10,15 +10,15 @@ from IPython import display
 class MLPenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(MLPenc, self).__init__(name=name)
-        self.dense1 = Dense(512, activation='relu')
+        self.dense1 = Dense(128, activation='relu')
         # self.bn1 = BatchNormalization()
-        self.dense2 = Dense(256, activation='relu')
+        self.dense2 = Dense(64, activation='relu')
         # self.bn2 = BatchNormalization()
-        self.dense3 = Dense(128, activation='relu')
+        self.dense3 = Dense(16, activation='relu')
         # self.dense4 = Dense(128, activation='relu')
         # self.dense5 = Dense(128, activation='relu')
         # self.bn3 = BatchNormalization()
-        self.latent = Dense(128, activation='relu')#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(4, activation='relu')#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         # self.bn4 = BatchNormalization()
 
     def call(self, x):
@@ -237,7 +237,10 @@ def get_fish():
         with tf.GradientTape() as tape:
             y_out = mod(x,training=True)
             c_index = tf.argmax(y_out,1)[0]
-            loss = tf.math.log(y_out[0,c_index])
+            # if y is not None:
+            # loss = -tf.math.log(y_out[0,c_index])
+            # else:
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients
@@ -263,7 +266,7 @@ def get_train():
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
                         f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))   
-                        loss += (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))                    
+                        loss += f_loss             
             
         gradients = tape.gradient(loss, mod.trainable_variables)
         optimizer.apply_gradients(zip(gradients, mod.trainable_variables))

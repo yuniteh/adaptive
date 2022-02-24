@@ -40,6 +40,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_accs[0] = train_accuracy(model(x_train),y_train)
         print(f'Initial train acc: {train_accs[0]:.4f},', end=' ')
         for task in range(len(x_test)):
+            val_accuracy.reset_states()
             test_accs[task][0] = val_accuracy(model(x_test[task]),y_test[task])
 
             if task != len(x_test)-1:
@@ -61,14 +62,16 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             # x_in = x_train[:100,...]
             # y_in = y_train[:100,...]
 
-            if iter < 10 or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
-                lam_in = 0
-            else:
-                lam_in = lams[l]
+            # if iter < 10 or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
+            #     lam_in = 0
+            # else:
+            #     lam_in = lams[l]
+            # if iter == 0:
+            #     lam_in = 0
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, train_accuracy, lam=lam_in)
-                if loss[0,l] == 0:
+                if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
                     f_loss[0,l] = fish_loss.result()
                 
@@ -130,8 +133,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for i in range(3):
             if l == len(lams)-1:
                 ax[l,i].set_xlabel("Iterations")
-            else:
-                ax[l,i].get_xaxis().set_visible(False)
+            # else:
+            #     ax[l,i].set_xlabel(().set_visible(False)
     
     return loss, f_loss
 
