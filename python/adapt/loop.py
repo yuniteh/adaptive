@@ -61,8 +61,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             # x_in = x_train[:100,...]
             # y_in = y_train[:100,...]
 
-            if iter < 30:
-                lam_in = lams[l]*2
+            if iter < 10 or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
+                lam_in = 0
             else:
                 lam_in = lams[l]
 
