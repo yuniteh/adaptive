@@ -192,34 +192,40 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
     else:
         return mlp, cnn, w, c
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn, mlp, w, c, cnn_align=None, mlp_align=None):
-    acc = np.empty((3,))
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, cnn_align=None, mlp_align=None):
+    acc = np.empty((4,))
     test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
-    test_loss.reset_states()
-    test_accuracy.reset_states()
-
-    # test CNN
-    test_mod = get_test()
-    test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy, align=cnn_align)
-    acc[2] = test_accuracy.result()*100
-
-    # test MLP
-    test_loss.reset_states()
-    test_accuracy.reset_states()
-
-    test_mod = get_test()
-    test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
-    acc[1] = test_accuracy.result()*100
-
-    # test_loss.reset_states()
-    # test_accuracy.reset_states()
-    # test_mod = get_test()
-    # test_mod(x_test_mlp, y_test, w, test_loss, test_accuracy, align=mlp_align)
-    # acc[0] = test_accuracy.result()*100
 
     #test LDA
-    acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+    if lda is not None:
+        w = lda[0]
+        c = lda[1]
+        acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+
+    # test MLP
+    if mlp is not None:
+        test_loss.reset_states()
+        test_accuracy.reset_states()
+        test_mod = get_test()
+        test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
+        acc[1] = test_accuracy.result()*100
+    
+    # test CNN
+    if cnn is not None:
+        test_loss.reset_states()
+        test_accuracy.reset_states()
+        test_mod = get_test()
+        test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy, align=cnn_align)
+        acc[2] = test_accuracy.result()*100
+
+    # test EWC
+    if ewc is not None:
+        test_loss.reset_states()
+        test_accuracy.reset_states()
+        test_mod = get_test()
+        test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
+        acc[3] = test_accuracy.result()*100
 
     return acc
 
