@@ -88,7 +88,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
 
     # calculate class MAV
     if prop_b:
-        mav_all, _, _, _ = extract_scale(x_train_clean,load=False,ft='mav',caps=True)
+        mav_all, _, _, _ = extract_scale(x_train_clean,load=False,ft='mav',caps=True,params=y_train_clean)
         mav_class = np.empty((y_train_clean.shape[1],x_train_clean.shape[1]))
         for i in range(mav_class.shape[0]):
             mav_class[i,:] = np.squeeze(np.mean(mav_all[y_train_clean[:,i].astype(bool),...],axis=0))
@@ -106,7 +106,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         scaler = MinMaxScaler(feature_range=(0,1))
         load = False
         
-    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True) 
+    x_train_noise_cnn, scaler, x_min, x_max = extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True,params=y_train_clean) 
     x_train_noise_cnn = x_train_noise_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
@@ -119,7 +119,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # LDA data
     y_train = p_train[:,0]
     y_train_lda = y_train[...,np.newaxis] - 1
-    x_train_lda = extract_feats_caps(x_train,ft=ft)
+    x_train_lda = extract_feats_caps(x_train,ft=ft,params=to_categorical(p_train[:,0]-1,num_classes=num_classes))
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
@@ -133,7 +133,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
     x_test, y_test = shuffle(x, y, random_state = 0)
 
     # Extract features
-    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,load=True,ft=ft,caps=True) 
+    x_test_cnn, _, _, _ = extract_scale(x_test,scaler,load=True,ft=ft,caps=True,params=y) 
     x_test_cnn = x_test_cnn.astype('float32')
 
     # reshape data for nonconvolutional network
@@ -141,7 +141,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
     
     # LDA data
     y_lda = p_test[:,[0]] - 1
-    x_lda = extract_feats_caps(x)
+    x_lda = extract_feats_caps(x,params=y)
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
@@ -491,10 +491,10 @@ def extract_feats_caps(raw,ft='feat',uint=False,order=6,params=None):
         feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
 
     if params is not None:
-        z_all = np.sum(feat_out[params[:,-1]==1,:,0,:], axis=1)
+        z_all = np.sum(feat_out[params[:,0]==1,:,0,:], axis=1)
         z_mav = th * np.mean(z_all,axis=0)
         mav_all = np.sum(feat_out[:,:,0,:], axis=1)
-        feat_out = feat_out[params[:,-1]==1 or (params[:,-1] != 1 and mav_all > z_mav),...]
+        feat_out = feat_out[params[:,0]==1 or (params[:,-1] != 1 and mav_all > z_mav),...]
 
     return feat_out
 
