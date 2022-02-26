@@ -439,13 +439,14 @@ def add_noise(raw, params, n_type='flat', scale=5, real_noise=0,emg_scale=[1,1,1
     clean = truncate(clean)
     return noisy,clean,y
 
-def extract_feats_caps(raw,ft='feat',uint=False,order=6):
+def extract_feats_caps(raw,ft='feat',uint=False,order=6,params=None):
     # raw format (samps x chan x win)
     if raw.shape[-1] == 1:
         raw = np.squeeze(raw)
     N = raw.shape[2]
     ch = raw.shape[1]
     samp = raw.shape[0]
+    th = 1.1
 
     if uint:
         z_th = 164
@@ -488,6 +489,12 @@ def extract_feats_caps(raw,ft='feat',uint=False,order=6):
 
     if not uint:
         feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
+
+    if params is not None:
+        z_all = np.sum(feat_out[params[:,-1]==1,:,0,:], axis=1)
+        z_mav = th * np.mean(z_all,axis=0)
+        mav_all = np.sum(feat_out[:,:,0,:], axis=1)
+        feat_out = feat_out[params[:,-1]==1 or (params[:,-1] != 1 and mav_all > z_mav),...]
 
     return feat_out
 
