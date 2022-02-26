@@ -216,8 +216,6 @@ class EWC(Model):
         plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
         plt.xlabel("Number of samples")
         plt.ylabel("Mean absolute Fisher difference")
-        display.display(plt.gcf())
-        display.clear_output(wait=True)
 
         # divide totals by number of samples
         for v in range(len(self.F_accum)):

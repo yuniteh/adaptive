@@ -4,6 +4,8 @@ from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
+from IPython import display
+
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
@@ -28,7 +30,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         if lams[l] == 0:
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
         
         # train functions
         train_ewc = get_train()
@@ -132,6 +134,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 ax[l,i].set_xlabel("Iterations")
             # else:
             #     ax[l,i].set_xlabel(().set_visible(False)
+    display.display(plt.gcf())
     
     return loss, f_loss
 
