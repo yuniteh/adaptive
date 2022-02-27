@@ -33,27 +33,27 @@ class EWCenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(EWCenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
-        self.bn1 = BatchNormalization()
+        # self.bn1 = BatchNormalization()
         self.dense2 = Dense(128, activation='relu')
-        self.bn2 = BatchNormalization()
+        # self.bn2 = BatchNormalization()
         self.dense3 = Dense(16, activation='relu')
         # self.dense4 = Dense(128, activation='relu')
         # self.dense5 = Dense(128, activation='relu')
-        self.bn3 = BatchNormalization()
+        # self.bn3 = BatchNormalization()
         self.latent = Dense(4, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()
+        # self.bn4 = BatchNormalization()
 
     def call(self, x):
         x = self.dense1(x)
-        x = self.bn1(x)
+        # x = self.bn1(x)
         x = self.dense2(x)
-        x = self.bn2(x)
+        # x = self.bn2(x)
         x = self.dense3(x)
-        x = self.bn3(x)
+        # x = self.bn3(x)
         # x = self.dense4(x)
         # x = self.dense5(x)
         x = self.latent(x)
-        x = self.bn4(x)
+        # x = self.bn4(x)
         return x
 
 class CNNenc(Model):
@@ -239,6 +239,8 @@ class EWC(Model):
         for v in range(len(self.trainable_weights)):
             self.star_vars.append(cp.deepcopy(self.trainable_weights[v].numpy()))
         
+        for v in range(len(self.non_trainable_weights)):
+            self.all_vars.append(cp.deepcopy(self.non_trainable_weights[v].numpy()))
         # self.all_vars = cp.deepcopy(self.get_weights())
 
     def restore(self):
@@ -247,6 +249,8 @@ class EWC(Model):
             for v in range(len(self.trainable_weights)):
                 self.trainable_weights[v].assign(self.star_vars[v])
             
+            for v in range(len(self.non_trainable_weights)):
+                self.non_trainable_weights[v].assign(self.all_vars[v])
             # self.set_weights(self.all_vars)
 
 def eval_nn(x, y, mod, clean):
