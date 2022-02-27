@@ -166,7 +166,8 @@ class CNNprop(Model):
 class EWC(Model):
     def __init__(self, n_class=7):
         super(EWC, self).__init__()
-        self.enc = EWCenc()
+        # self.enc = EWCenc()
+        self.enc = CNNenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):

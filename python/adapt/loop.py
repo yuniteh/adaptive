@@ -234,7 +234,8 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
         test_loss.reset_states()
         test_accuracy.reset_states()
         test_mod = get_test()
-        test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
+        test_mod(x_test_cnn, y_test, ewc, test_loss, test_accuracy)
+        # test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
         acc[3] = test_accuracy.result()*100
 
     return acc
