@@ -10,7 +10,7 @@ from AdaBound2 import AdaBound as AdaBoundOptimizer
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
-    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(100)
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(128)
 
     _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
     
@@ -30,9 +30,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         
         if lams[l] == 0:
             # optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
-            optimizer = AdaBoundOptimizer(learning_rate=0.01, final_lr=0.1)
+            optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
+            optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         
         # train functions
         train_ewc = get_train()
@@ -94,6 +95,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             train_diff = train_last - train_loss.result()
             train_last = train_loss.result()
             if train_diff > 0 and train_diff < 1e-4:
+                print('early stop')
                 break
         
         print(f'Final train acc: {train_accs[iter+1]:.4f}, ', end=' '),
@@ -134,6 +136,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for i in range(3):
             if l == len(lams)-1:
                 ax[l,i].set_xlabel("Iterations")
+            ax[l,i].set_xlim([0,iter+2])
             # else:
             #     ax[l,i].set_xlabel(().set_visible(False)
     # display.display(plt.gcf())
@@ -141,7 +144,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
     return loss, f_loss
 
 
-def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
+def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
     # Train NNs
     if mlp == None:
         mlp = MLP(n_class=n_dof)
@@ -155,8 +158,9 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
         cnn_ali = None
 
     # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-    optimizer = AdaBoundOptimizer(learning_rate=0.01, final_lr=0.1)
+    optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
+    fish_loss = tf.keras.metrics.Mean(name='fish_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
     models = [mlp,cnn]
     for model in models:
@@ -186,7 +190,7 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
                     print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
 
     # Train LDA
-    if isinstance(x_train_lda,np.ndarray):
+    if x_train_lda is not None:
         w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
     else:
         w=0
