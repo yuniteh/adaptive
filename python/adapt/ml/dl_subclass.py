@@ -239,7 +239,7 @@ class EWC(Model):
         for v in range(len(self.trainable_weights)):
             self.star_vars.append(cp.deepcopy(self.trainable_weights[v].numpy()))
         
-        self.all_vars = cp.deepcopy(self.get_weights())
+        # self.all_vars = cp.deepcopy(self.get_weights())
 
     def restore(self):
         # reassign optimal weights for latest task
@@ -247,7 +247,7 @@ class EWC(Model):
             for v in range(len(self.trainable_weights)):
                 self.trainable_weights[v].assign(self.star_vars[v])
             
-            self.set_weights(self.all_vars)
+            # self.set_weights(self.all_vars)
 
 def eval_nn(x, y, mod, clean):
     y_pred = np.argmax(mod(x).numpy(),axis=1)
