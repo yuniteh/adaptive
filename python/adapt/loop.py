@@ -5,6 +5,7 @@ from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from IPython import display
+from AdaBound2 import AdaBound as AdaBoundOptimizer
 
     
 # train/compare vanilla sgd and ewc
@@ -26,9 +27,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_accs = np.zeros(int(num_iter/disp_freq)+1)
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
-
+        
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            optimizer = AdaBoundOptimizer(learning_rate=0.01, final_lr=0.1)
         else:
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
         
@@ -134,7 +136,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 ax[l,i].set_xlabel("Iterations")
             # else:
             #     ax[l,i].set_xlabel(().set_visible(False)
-    display.display(plt.gcf())
+    # display.display(plt.gcf())
     
     return loss, f_loss
 
@@ -152,7 +154,8 @@ def train_models(traincnn, trainmlp, x_train_lda, y_train_lda, n_dof, ep=30, mlp
         mlp_ali = None
         cnn_ali = None
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+    # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+    optimizer = AdaBoundOptimizer(learning_rate=0.01, final_lr=0.1)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
     models = [mlp,cnn]

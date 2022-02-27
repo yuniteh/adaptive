@@ -89,7 +89,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
 
     # calculate class MAV
     if prop_b:
-        mav_all, _, _, _, y_train_clean, ind = extract_scale(x_train_clean,load=False,ft='mav',caps=True,params=y_train_clean)
+        mav_all, _, _, _, y_train_clean, ind = extract_scale(x_train_clean,load=False,ft='mav',caps=True)
         mav_class = np.empty((y_train_clean.shape[1],x_train_clean.shape[1]))
         for i in range(mav_class.shape[0]):
             mav_class[i,:] = np.squeeze(np.mean(mav_all[y_train_clean[:,i].astype(bool),...],axis=0))
@@ -112,8 +112,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
 
     # reshape data for nonconvolutional network
     x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
-    print(x_train_noise_mlp.shape)
-    print(y_train_clean.shape)
 
     # create batches
     trainmlp = tf.data.Dataset.from_tensor_slices((x_train_noise_mlp, y_train_clean, prop)).shuffle(x_train_noise_mlp.shape[0],reshuffle_each_iteration=True).batch(batch_size)
@@ -123,7 +121,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     y_train = p_train[:,0]
     y_train_lda = y_train[...,np.newaxis] - 1
     x_train_lda = extract_feats_caps(x_train,ft=ft)
-    y_train_lda = np.argmax(y_out, axis=1)
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
@@ -563,7 +560,7 @@ def extract_feats(raw,th=0.01,ft='feat',order=6,emg_scale=1):
         feat_out = mav
     return feat_out
 
-def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False,params=None):
+def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False):
     # extract features 
     if ft == 'feat':
         num_feat = 4
@@ -573,7 +570,7 @@ def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False,params=
         num_feat = 1
     
     if caps:
-        x_temp, params = extract_feats_caps(x,ft=ft,params=params)
+        x_temp = extract_feats_caps(x,ft=ft)
         x_temp = np.transpose(x_temp.reshape((x_temp.shape[0],num_feat,-1)),(0,2,1))[...,np.newaxis]
         x_test = x_temp.reshape(x_temp.shape[0]*x_temp.shape[1],-1)
         x_min = x_test.min(axis=0)
@@ -591,7 +588,7 @@ def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False,params=
         x_vae = x_temp
     
     if caps:
-        return x_vae, scaler, x_min, x_max, params
+        return x_vae, scaler, x_min, x_max
     else:
         return x_vae, scaler
 
