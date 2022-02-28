@@ -41,16 +41,13 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_ewc = get_train()
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         fish_loss = tf.keras.metrics.Mean(name='fish_loss')
-        train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
 
         # validation functions
         val_mod = get_test()
         val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
         
         # initial loss and accuracies
-        val_mod(x_train[:x_train.shape[0]//5,...], y_train[:x_train.shape[0]//5,...], model, test_accuracy=train_accuracy)
-        train_accs[0] = train_accuracy.result()
-        print(f'Initial train acc: {train_accs[0]:.4f},', end=' ')
+        print(f'Initial', end=' ')
         for task in range(len(x_test)):
             val_accuracy.reset_states()
             val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
@@ -68,7 +65,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         for iter in range(num_iter):
             train_loss.reset_states()
             fish_loss.reset_states()
-            train_accuracy.reset_states()
             val_accuracy.reset_states()
 
             ## weight cycling
@@ -92,7 +88,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             if iter % disp_freq == 0:
                 loss[int(iter/disp_freq)+1,l] = train_loss.result()
                 f_loss[int(iter/disp_freq)+1,l] = fish_loss.result()
-                # train_accs[int(iter/disp_freq)+1] = train_accuracy(model(x_train[:x_train.shape[0]//5,...]),y_train[:x_train.shape[0]//5,...])
                 for task in range(len(x_test)):
                     val_accuracy.reset_states()
                     val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
@@ -105,7 +100,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 print('early stop')
                 break
         
-        print(f'Final train acc: {train_accs[iter+1]:.4f}, ', end=' '),
+        print(f'Final', end=' '),
         for task in range(len(x_test)):       
             if task != len(x_test)-1:
                 end_p = ', '
