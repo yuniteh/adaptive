@@ -13,7 +13,8 @@ import multiprocessing as mp
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False):
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(64)
 
-    _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
+    if plot_loss:
+        _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
     
     loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
@@ -209,6 +210,7 @@ def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None):
     acc = np.empty((5,))
+    acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
