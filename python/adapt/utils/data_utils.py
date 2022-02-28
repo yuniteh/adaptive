@@ -68,21 +68,17 @@ def truncate(data):
     return data
 
 def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None, ft='feat', split=False):
-    # x_train, params = threshold(x_train,params)
+    x_train, params = threshold(x_train,params)
     if split:
-        x_rest = x_train[params[:,2] == 1]
-        x_train_half = x_train[params[:,1]%2==0 and params[:,2] != 1]
-        x_test_half = x_train[params[:,1]%2!=0 and params[:,2] !=1]
+        x_rest = x_train[params[:,2] == 1,...]
+        x_train_half = x_train[(params[:,1]%2==0) & (params[:,2] != 1),...]
         x_train = np.vstack((x_rest[:x_rest.shape[0]//2,...],x_train_half))
-        x_test = np.vstack((x_rest[x_rest.shape[0]//2:,...],x_test_half))
 
-        p_rest = params[params[:,2] == 1]
-        p_train_half = params[params[:,1]%2==0 and params[:,2] != 1]
-        p_test_half = params[params[:,1]%2!=0 and params[:,2] !=1]
+        p_rest = params[params[:,2] == 1,...]
+        p_train_half = params[(params[:,1]%2==0) & (params[:,2] != 1),...]
         params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_train_half))
-        p_test = np.vstack((p_rest[p_rest.shape[0]//2:,...],p_test_half))
 
-    x_train, p_train = shuffle(x_train, params, random_state = 0)
+    x_train, params = shuffle(x_train, params, random_state = 0)
     
     if not isinstance(emg_scale,np.ndarray):
         emg_scale = np.ones((np.size(x_train,1),1))
@@ -91,12 +87,12 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     x_train *= emg_scale
 
     if noise:
-        x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, p_train, num_classes=num_classes)
+        x_train_noise, x_train_clean, y_train_clean = add_noise_caps(x_train, params, num_classes=num_classes)
             
         # shuffle data to make even batches
         x_train_noise, x_train_clean, y_train_clean = shuffle(x_train_noise, x_train_clean, y_train_clean, random_state = 0)
     else:
-        y = to_categorical(p_train[:,0]-1,num_classes=num_classes)
+        y = to_categorical(params[:,0]-1,num_classes=num_classes)
         x_train_noise, y_train_clean = shuffle(x_train,y,random_state=0)
         x_train_clean = cp.deepcopy(x_train_noise)
 
@@ -131,20 +127,25 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(batch_size)
 
     # LDA data
-    y_train = p_train[:,0]
+    y_train = params[:,0]
     y_train_lda = y_train[...,np.newaxis] - 1
     x_train_lda = extract_feats_caps(x_train,ft=ft)
 
-    if split:
-        y_test, x_test_mlp, x_test_cnn, x_lda, y_lda = prep_test_caps(x_test, p_test, scaler, emg_scale, num_classes=num_classes, ft=ft)
-        return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop, y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
-    else:
-        return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
+    return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
-def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
-    # x, params = threshold(x,params)
-    x, p_test = shuffle(x, params, random_state = 0)
-    y = to_categorical(p_test[:,0]-1,num_classes=num_classes)
+def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat', split=False):
+    x, params = threshold(x,params)
+    if split:
+        x_rest = x[params[:,2] == 1,...]
+        x_test_half = x[(params[:,1]%2!=0) & (params[:,2] !=1),...]
+        x = np.vstack((x_rest[:x_rest.shape[0]//2,...],x_test_half))
+
+        p_rest = params[params[:,2] == 1,...]
+        p_test_half = params[(params[:,1]%2!=0) & (params[:,2] !=1),...]
+        params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_test_half))
+
+    x, params = shuffle(x, params, random_state = 0)
+    y = to_categorical(params[:,0]-1,num_classes=num_classes)
 
     x *= emg_scale
 
@@ -159,7 +160,7 @@ def prep_test_caps(x, params, scaler, emg_scale, num_classes=None,ft='feat'):
     x_test_mlp = x_test_cnn.reshape(x_test_cnn.shape[0],-1)
     
     # LDA data
-    y_lda = p_test[:,[0]] - 1
+    y_lda = params[:,[0]] - 1
     x_lda = extract_feats_caps(x)
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
@@ -472,12 +473,16 @@ def threshold(raw,params):
 
     mav=np.sum(np.abs(raw_demean),axis=2)
 
-    z_all = np.sum(mav[params[:,0]==1,:], axis=1)
+    z_all = np.sum(mav[params[:,-1]==1,:], axis=1)
     z_mav = th * np.mean(z_all,axis=0)
     mav_all = np.sum(mav, axis=1)
-    ind = (params[:,0]==1) | ((params[:,-1] != 1) & (mav_all > z_mav))
+    ind = (params[:,-1]==1) | ((params[:,-1] != 1) & (mav_all > z_mav))
     raw_out = raw[ind,...]
     params_out = params[ind,...]
+    raw_z = raw[~ind,...]
+    params_z = np.tile([1,1,1],(raw_z.shape[0],1))
+    raw_out = np.vstack((raw_z,raw_out))
+    params_out = np.vstack((params_z,params_out))
 
     return raw_out, params_out
 
