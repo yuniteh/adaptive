@@ -214,9 +214,10 @@ class EWC(Model):
                     for v in range(len(self.F_accum)):
                         F_prev[v] = self.F_accum[v]/(i+1)
 
-        plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
-        plt.xlabel("Number of samples")
-        plt.ylabel("Mean absolute Fisher difference")
+        if plot_diffs:
+            plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
+            plt.xlabel("Number of samples")
+            plt.ylabel("Mean absolute Fisher difference")
 
         # divide totals by number of samples
         for v in range(len(self.F_accum)):

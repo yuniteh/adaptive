@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from IPython import display
 from AdaBound2 import AdaBound as AdaBoundOptimizer
+import multiprocessing as mp
 
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
-    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(128)
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(64)
 
     _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
     
@@ -19,6 +20,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
     lams_all = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
 
     for l in range(len(lams)):
+        tf.keras.backend.clear_session()
         lam_in = np.abs(lams[l])
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
@@ -29,11 +31,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
-            optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
-            optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
+            # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         
         # train functions
         train_ewc = get_train()
@@ -42,14 +44,17 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
 
         # validation functions
+        val_mod = get_test()
         val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
         
         # initial loss and accuracies
-        train_accs[0] = train_accuracy(model(x_train),y_train)
+        val_mod(x_train[:x_train.shape[0]//5,...], y_train[:x_train.shape[0]//5,...], model, test_accuracy=train_accuracy)
+        train_accs[0] = train_accuracy.result()
         print(f'Initial train acc: {train_accs[0]:.4f},', end=' ')
         for task in range(len(x_test)):
             val_accuracy.reset_states()
-            test_accs[task][0] = val_accuracy(model(x_test[task]),y_test[task])
+            val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+            test_accs[task][0] = val_accuracy.result()
 
             if task != len(x_test)-1:
                 end_p = ', '
@@ -74,6 +79,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in)
+                
                 if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
                     f_loss[0,l] = fish_loss.result()
@@ -86,10 +92,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             if iter % disp_freq == 0:
                 loss[int(iter/disp_freq)+1,l] = train_loss.result()
                 f_loss[int(iter/disp_freq)+1,l] = fish_loss.result()
-                train_accs[int(iter/disp_freq)+1] = train_accuracy(model(x_train),y_train)
+                # train_accs[int(iter/disp_freq)+1] = train_accuracy(model(x_train[:x_train.shape[0]//5,...]),y_train[:x_train.shape[0]//5,...])
                 for task in range(len(x_test)):
                     val_accuracy.reset_states()
-                    test_accs[task][int(iter/disp_freq)+1] = val_accuracy(model(x_test[task]),y_test[task])
+                    val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+                    test_accs[task][int(iter/disp_freq)+1] = val_accuracy.result()
 
             # early stopping criteria
             train_diff = train_last - train_loss.result()
@@ -158,7 +165,8 @@ def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7
         cnn_ali = None
 
     # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-    optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
+    # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
+    optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     fish_loss = tf.keras.metrics.Mean(name='fish_loss')
     train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
@@ -188,6 +196,8 @@ def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7
             if print_b:
                 if epoch == 0 or epoch == ep-1:
                     print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+        
+        tf.keras.backend.clear_session()
 
     # Train LDA
     if x_train_lda is not None:
