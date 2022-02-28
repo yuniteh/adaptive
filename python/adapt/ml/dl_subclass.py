@@ -164,10 +164,12 @@ class CNNprop(Model):
         return y, prop
 
 class EWC(Model):
-    def __init__(self, n_class=7):
+    def __init__(self, n_class=7, mod='MLP'):
         super(EWC, self).__init__()
-        # self.enc = EWCenc()
-        self.enc = CNNenc()
+        if mod == 'MLP':
+            self.enc = EWCenc()
+        else:
+            self.enc = CNNenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):

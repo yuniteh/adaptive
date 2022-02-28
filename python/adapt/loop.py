@@ -10,7 +10,7 @@ import multiprocessing as mp
 
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0]):
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False):
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(64)
 
     _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
@@ -112,36 +112,36 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         colors = ['r', 'b', 'g']
         if disp_freq > iter:
             disp_freq = 1
+        
+        if plot_loss:
+            ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2,l], 'r-', label="class loss")
+            if np.sum(f_loss[:,l]) > 0:
+                ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2,l], 'b-', label="fish loss")
+            ax[l,0].legend(loc="center right")
+            ax[l,0].set_ylabel("Loss")
 
-        ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2,l], 'r-', label="class loss")
-        if np.sum(f_loss[:,l]) > 0:
-            ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2,l], 'b-', label="fish loss")
-        ax[l,0].legend(loc="center right")
-        ax[l,0].set_ylabel("Loss")
+            ax[l,1].plot(range(0,iter+2,disp_freq), train_accs[:iter+2], 'b-')
+            ax[l,1].set_ylabel("Train Accuracy")
+            ax[l,1].set_ylim((0,1.1))
 
-        ax[l,1].plot(range(0,iter+2,disp_freq), train_accs[:iter+2], 'b-')
-        ax[l,1].set_ylabel("Train Accuracy")
-        ax[l,1].set_ylim((0,1.1))
+            for task in range(len(x_test)):
+                c = chr(ord('A') + task)
+                ax[l,2].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + c)
+            ax[l,2].legend(loc="center right")
+            ax[l,2].set_ylabel("Valid Accuracy")
+            ax[l,2].set_ylim((0,1.1))
 
-        for task in range(len(x_test)):
-            c = chr(ord('A') + task)
-            ax[l,2].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + c)
-        ax[l,2].legend(loc="center right")
-        ax[l,2].set_ylabel("Valid Accuracy")
-        ax[l,2].set_ylim((0,1.1))
+            if lams[l] == 0:
+                ax[l,1].set_title('Vanilla MLP')
+            else:
+                ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
 
-        if l == 0:
-            ax[l,1].set_title('Vanilla MLP')
-        else:
-            ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
-
-        for i in range(3):
-            if l == len(lams)-1:
-                ax[l,i].set_xlabel("Iterations")
-            ax[l,i].set_xlim([0,iter+2])
-            # else:
-            #     ax[l,i].set_xlabel(().set_visible(False)
-    # display.display(plt.gcf())
+            for i in range(3):
+                if l == len(lams)-1:
+                    ax[l,i].set_xlabel("Iterations")
+                ax[l,i].set_xlim([0,iter+2])
+                # else:
+                #     ax[l,i].set_xlabel(().set_visible(False)
     
     return loss, f_loss
 
@@ -207,8 +207,8 @@ def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7
     else:
         return mlp, cnn, w, c
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, cnn_align=None, mlp_align=None):
-    acc = np.empty((4,))
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None):
+    acc = np.empty((5,))
     test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
@@ -239,9 +239,16 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
         test_loss.reset_states()
         test_accuracy.reset_states()
         test_mod = get_test()
-        test_mod(x_test_cnn, y_test, ewc, test_loss, test_accuracy)
-        # test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
+        test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
         acc[3] = test_accuracy.result()*100
+
+    # test EWC
+    if ewc_cnn is not None:
+        test_loss.reset_states()
+        test_accuracy.reset_states()
+        test_mod = get_test()
+        test_mod(x_test_cnn, y_test, ewc_cnn, test_loss, test_accuracy)
+        acc[4] = test_accuracy.result()*100
 
     return acc
 
