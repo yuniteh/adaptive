@@ -111,9 +111,11 @@ class MLP(Model):
 class ALI(Model):
     def __init__(self, n=32, name='aligner'):
         super(ALI, self).__init__(name=name)
-        self.dense1 = Dense(64, activation='relu')
+        self.dense1 = Dense(128, activation='relu')
         self.bn1 = BatchNormalization()
-        self.dense2 = Dense(n, activation='relu')
+        self.dense2 = Dense(64, activation='relu')
+        self.bn2 = BatchNormalization()
+        self.dense3 = Dense(n, activation='relu')
 
     def call(self,x):
         in_shape = x.shape
@@ -121,6 +123,8 @@ class ALI(Model):
         x = self.dense1(x)
         x = self.bn1(x)
         x = self.dense2(x)
+        x = self.bn2(x)
+        x = self.dense3(x)
         if len(in_shape) > 2:
             x = tf.reshape(x,in_shape)
         return x
@@ -300,9 +304,13 @@ def get_train():
                     for v in range(len(mod.trainable_weights)):
                         f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))   
                         loss += f_loss             
-            
-        gradients = tape.gradient(loss, mod.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+        
+        if align is not None:
+            gradients = tape.gradient(loss, align.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, align.trainable_variables))
+        else:
+            gradients = tape.gradient(loss, mod.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
 
         if train_loss is not None:
             train_loss(loss)

@@ -11,17 +11,16 @@ import multiprocessing as mp
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False):
-    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(64)
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
 
     if plot_loss:
-        _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
+        _, ax = plt.subplots(len(lams),2,squeeze=False,figsize=(12,len(lams)*3.5))
     
     loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     lams_all = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
 
     for l in range(len(lams)):
-        tf.keras.backend.clear_session()
         lam_in = np.abs(lams[l])
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
@@ -32,10 +31,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.00001)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         
         # train functions
@@ -121,79 +121,76 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             ax[l,0].legend(loc="center right")
             ax[l,0].set_ylabel("Loss")
 
-            ax[l,1].plot(range(0,iter+2,disp_freq), train_accs[:iter+2], 'b-')
-            ax[l,1].set_ylabel("Train Accuracy")
-            ax[l,1].set_ylim((0,1.1))
-
             for task in range(len(x_test)):
                 c = chr(ord('A') + task)
-                ax[l,2].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + c)
-            ax[l,2].legend(loc="center right")
-            ax[l,2].set_ylabel("Valid Accuracy")
-            ax[l,2].set_ylim((0,1.1))
+                ax[l,1].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + c)
+            ax[l,1].legend(loc="center right")
+            ax[l,1].set_ylabel("Valid Accuracy")
+            ax[l,1].set_ylim((0,1.1))
 
             if lams[l] == 0:
-                ax[l,1].set_title('Vanilla MLP')
+                ax[l,0].set_title('Vanilla MLP')
             else:
-                ax[l,1].set_title('EWC (λ: ' + str(lams[l]) + ')')
+                ax[l,0].set_title('EWC (λ: ' + str(lams[l]) + ')')
 
-            for i in range(3):
+            for i in range(2):
                 if l == len(lams)-1:
                     ax[l,i].set_xlabel("Iterations")
                 ax[l,i].set_xlim([0,iter+2])
                 # else:
                 #     ax[l,i].set_xlabel(().set_visible(False)
+
+        tf.keras.backend.clear_session()
     
     return loss, f_loss
 
 
-def train_models(traincnn, trainmlp, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False,lr=0.001, align=False):
+def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.001, align=False):
     # Train NNs
-    if mlp == None:
-        mlp = MLP(n_class=n_dof)
-    if cnn == None:
-        cnn = CNN(n_class=n_dof)
-    if align == True:
-        mlp_ali = ALI()
-        cnn_ali = ALI()
-    else:
-        mlp_ali = None
-        cnn_ali = None
-
-    # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-    # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
-    train_loss = tf.keras.metrics.Mean(name='train_loss')
-    fish_loss = tf.keras.metrics.Mean(name='fish_loss')
-    train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-    models = [mlp,cnn]
-    for model in models:
-        if isinstance(model,CNN):
-            ds = traincnn
+    if traincnn is not None or trainmlp is not None:
+        models = []
+        if mlp == None and trainmlp is not None:
+            mlp = MLP(n_class=n_dof)
+            models.append(mlp)
+        if cnn == None and traincnn is not None:
+            cnn = CNN(n_class=n_dof)
+            models.append(cnn)
+        if align == True:
+            mlp_ali = ALI()
+            cnn_ali = ALI()
         else:
-            ds = trainmlp
-        
-        if not align:
-            ali = None
+            mlp_ali = None
+            cnn_ali = None
 
-        train_mod = get_train()
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
+        # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+        train_loss = tf.keras.metrics.Mean(name='train_loss')
+        train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+        for model in models:
+            if isinstance(model,CNN):
+                ds = traincnn
+            else:
+                ds = trainmlp
+            
+            train_mod = get_train()
 
-        for epoch in range(ep):
-            # Reset the metrics at the start of the next epoch
-            train_loss.reset_states()
-            train_accuracy.reset_states()
+            for epoch in range(ep):
+                # Reset the metrics at the start of the next epoch
+                train_loss.reset_states()
+                train_accuracy.reset_states()
 
-            for x, y, _ in ds:
-                if isinstance(model,CNN):
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
-                else:
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
+                for x, y, _ in ds:
+                    if isinstance(model,CNN):
+                        train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
+                    else:
+                        train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
 
-            if print_b:
-                if epoch == 0 or epoch == ep-1:
-                    print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
-        
-        tf.keras.backend.clear_session()
+                if print_b:
+                    if epoch == 0 or epoch == ep-1:
+                        print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+            
+            tf.keras.backend.clear_session()
 
     # Train LDA
     if x_train_lda is not None:
