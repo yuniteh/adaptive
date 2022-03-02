@@ -116,7 +116,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         prop = np.empty((y_train_clean.shape))
 
     # Extract features
-    if isinstance(scaler,MinMaxScaler):
+    if scaler is not None:
         load = True
     else:
         scaler = MinMaxScaler(feature_range=(0,1))
@@ -124,6 +124,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         
     x_train_noise_cnn, scaler, x_min, x_max= extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True) 
     x_train_noise_cnn = x_train_noise_cnn.astype('float32')        
+    print(scaler.get_params())
 
     # reshape data for nonconvolutional network
     x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
@@ -160,6 +161,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
 
     # shuffle data to make even batches
     x_test, y_test = shuffle(x, y, random_state = 0)
+    x_test, y_test = x,y
 
     # Extract features
     if scaler is not None:
@@ -174,7 +176,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
 
     # LDA data
     y_lda = params[:,[0]] - 1
-    x_lda = extract_feats_caps(x_orig)
+    x_lda = extract_feats_caps(x_orig,ft=ft)
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
@@ -596,7 +598,7 @@ def extract_feats(raw,th=0.01,ft='feat',order=6,emg_scale=1):
         feat_out = mav
     return feat_out
 
-def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False):
+def extract_scale(x,scaler=None,load=True, ft='feat',emg_scale=1,caps=False):
     # extract features 
     if ft == 'feat':
         num_feat = 4
@@ -611,14 +613,17 @@ def extract_scale(x,scaler=0,load=True, ft='feat',emg_scale=1,caps=False):
         x_test = x_temp.reshape(x_temp.shape[0]*x_temp.shape[1],-1)
         x_min = x_test.min(axis=0)
         x_max = x_test.max(axis=0)
+        # X_std = (X - x_min)) / (x_max - x_min)
+        # X_scaled = X_std * (max - min) + min
     else:
         x_temp = np.transpose(extract_feats(x,ft=ft,emg_scale=emg_scale).reshape((x.shape[0],num_feat,-1)),(0,2,1))[...,np.newaxis]
     
     # scale features
-    if scaler != 0:
+    if scaler is not None:
         if load:
             x_vae = scaler.transform(x_temp.reshape(x_temp.shape[0]*x_temp.shape[1],-1)).reshape(x_temp.shape)
         else:
+            print('scaling')
             x_vae = scaler.fit_transform(x_temp.reshape(x_temp.shape[0]*x_temp.shape[1],-1)).reshape(x_temp.shape)
     else:
         x_vae = x_temp
