@@ -133,8 +133,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     traincnn = tf.data.Dataset.from_tensor_slices((x_train_noise_cnn, y_train_clean, prop)).shuffle(x_train_noise_cnn.shape[0],reshuffle_each_iteration=True).batch(batch_size)
 
     # LDA data
-    y_train = params[:,0]
-    y_train_lda = y_train[...,np.newaxis] - 1
+    y_train_lda = params[:,[0]] - 1
     x_train_lda = extract_feats_caps(x_orig,ft=ft)
 
     return trainmlp, traincnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
@@ -173,7 +172,6 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
         x_test_cnn = 0
         x_test_mlp = 0
 
-    
     # LDA data
     y_lda = params[:,[0]] - 1
     x_lda = extract_feats_caps(x_orig)
@@ -475,7 +473,7 @@ def add_noise(raw, params, n_type='flat', scale=5, real_noise=0,emg_scale=[1,1,1
     return noisy,clean,y
 
 
-def threshold(raw,params):
+def threshold(raw,params, z_mav=0):
     # raw format (samps x chan x win)
     if raw.shape[-1] == 1:
         raw = np.squeeze(raw)
@@ -489,7 +487,8 @@ def threshold(raw,params):
     mav=np.sum(np.abs(raw_demean),axis=2)
 
     z_all = np.sum(mav[params[:,-1]==1,:], axis=1)
-    z_mav = th * np.mean(z_all,axis=0)
+    if z_mav == 0:
+        z_mav = th * np.mean(z_all,axis=0)
     mav_all = np.sum(mav, axis=1)
     ind = (params[:,-1]==1) | ((params[:,-1] != 1) & (mav_all > z_mav))
     raw_out = raw[ind,...]
@@ -499,7 +498,7 @@ def threshold(raw,params):
     raw_out = np.vstack((raw_z,raw_out))
     params_out = np.vstack((params_z,params_out))
 
-    return raw_out, params_out
+    return raw_out, params_out, z_mav
 
 
 def extract_feats_caps(raw,ft='feat',uint=False,order=6):

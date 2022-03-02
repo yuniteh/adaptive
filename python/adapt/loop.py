@@ -31,11 +31,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.001)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.00001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         
         # train functions
@@ -69,10 +69,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             val_accuracy.reset_states()
 
             ## weight cycling
-            # if iter < 10 or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
-            #     lam_in = 0
-            # else:
-            #     lam_in = lams[l]
+            if iter < 10:# or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
+                lam_in = 0
+            else:
+                lam_in = lams[l]
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in)
@@ -162,7 +162,7 @@ def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=Non
             mlp_ali = None
             cnn_ali = None
 
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
         # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -265,10 +265,10 @@ def check_labels(test_data,test_params,train_dof,key):
                 test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
         overlap = ~np.in1d(test_dof, train_dof)
         if overlap.any():
-            print('Removing ' + test_dof[overlap])
+            print('Removing ' + str(test_dof[overlap]))
             for ov_i in range(np.sum(overlap)):
                 ind = test_params[:,2] == test_dof[overlap][ov_i]
-                test_params[ind,:] = []
-                test_data[ind,:] = []
+                test_params = test_params[~ind,...]
+                test_data = test_data[~ind,...]
     
     return test_data, test_params
