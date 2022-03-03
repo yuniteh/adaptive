@@ -10,7 +10,7 @@ import multiprocessing as mp
 
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False, bat=128):
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=False, bat=128, clda=None):
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
@@ -26,7 +26,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
         model.restore() # reassign optimal weights from previous training session
 
         test_accs = []
-        train_accs = np.zeros(int(num_iter/disp_freq)+1)
         for task in range(len(x_test)):
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
@@ -75,7 +74,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
                 lam_in = lams[l]
 
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in)
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda)
                 
                 if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
@@ -100,7 +99,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
             if train_diff > 0 and train_diff < 1e-4:
                 print('early stop')
                 break
-        
+
+        w, c, _, _, _ = train_lda(model.enc(x_train).numpy(),np.argmax(y_train,axis=1)[...,np.newaxis])
+
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
             if task != len(x_test)-1:
@@ -142,7 +143,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
 
         tf.keras.backend.clear_session()
     
-    return loss, f_loss
+    return w, c
 
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.001, align=False, bat=32, cnnlda=False):
