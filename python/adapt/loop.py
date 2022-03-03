@@ -275,11 +275,16 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
 
     # test EWC
     if ewc_cnn is not None:
-        test_loss.reset_states()
-        test_accuracy.reset_states()
-        test_mod = get_test()
-        test_mod(x_test_cnn, y_test, ewc_cnn, test_loss, test_accuracy)
-        acc[4] = test_accuracy.result()*100
+        if clda is None:
+            test_loss.reset_states()
+            test_accuracy.reset_states()
+            test_mod = get_test()
+            test_mod(x_test_cnn, y_test, ewc_cnn, test_loss, test_accuracy)
+            acc[4] = test_accuracy.result()*100
+        else:
+            w = clda[0]
+            c = clda[1]
+            acc[4] = eval_lda(w, c, ewc_cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
     return acc
 
