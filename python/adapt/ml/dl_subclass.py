@@ -279,10 +279,14 @@ class EWC(Model):
         if not hasattr(self,"F_old"):
             self.F_old = cp.deepcopy(self.F_accum)
             self.int = 1
-        else:  
+        else:
+            # if self.equal:
+            #     for v in range(len(self.F_accum)):
+            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/2
+            # else:
             self.int += 1
             for v in range(len(self.F_accum)):
-                self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/self.int
+                self.F_accum[v] = (self.F_accum[v] + self.F_old[v])#/self.int
             self.F_old = cp.deepcopy(self.F_accum)
 
 
