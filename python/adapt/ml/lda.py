@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import eig, inv
+import tensorflow as tf
 
 
 # train and predict for data: (samples,feat), label: (samples, 1)
@@ -19,6 +20,8 @@ def eval_lda(w, c, x_test, y_test, clean_size=None):
 
 # train LDA classifier for data: (samples,feat), label: (samples, 1)
 def train_lda(data,label,mu_bool=False, mu_class = 0, C = 0):
+    if not isinstance(data,np.ndarray):
+        data = data.numpy()
     m = data.shape[1]
     u_class = np.unique(label)
     n_class = u_class.shape[0]
@@ -62,4 +65,9 @@ def train_lda(data,label,mu_bool=False, mu_class = 0, C = 0):
 def predict(data,w,c):
     f = np.dot(w,data.T) + c
     out = np.argmax(f, axis=0)
+    return out
+
+def predict_tf(data,w,c):
+    f = tf.matmul(w,tf.transpose(data)) + c
+    out = tf.argmax(f, axis=0)
     return out

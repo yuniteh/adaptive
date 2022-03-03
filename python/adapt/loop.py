@@ -154,18 +154,18 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             if mlp == None:
                 mlp = MLP(n_class=n_dof)
             if y_train is not None:
-                mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
+                mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
                 mlp_ds = trainmlp
             models.append(mlp)
         if traincnn is not None:
             if cnn == None:
                 cnn = CNN(n_class=n_dof)
-            elif isinstance(cnn,CNN):
+            elif not isinstance(cnn,CNN):
                 w_c = cnn[1:3]
                 cnn = cnn[0]
             if y_train is not None:
-                cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
+                cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
                 cnn_ds = traincnn
             models.append(cnn)
@@ -195,7 +195,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 train_loss.reset_states()
                 train_accuracy.reset_states()
 
-                for x, y in ds:
+                for x, y, _ in ds:
                     if isinstance(model,CNN):
                         if w_c is not None:
                             train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c)
@@ -210,8 +210,10 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             
             tf.keras.backend.clear_session()
 
-    if cnn is not None and cnnlda:
-        w_c,c_c, _, _, _ = train_lda(cnn.enc(traincnn),np.argmax(y_train, axis=1, keepdims=True))
+    if cnnlda:
+        w_c,c_c, _, _, _ = train_lda(cnn.enc(traincnn).numpy(),np.argmax(y_train,axis=1)[...,np.newaxis])
+        w_c = w_c.astype('float32')
+        c_c = c_c.astype('float32')
     else:
         w_c=0
         c_c=0
@@ -251,7 +253,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
     
     # test CNN
     if cnn is not None:
-        if clda is not None:
+        if clda is None:
             test_loss.reset_states()
             test_accuracy.reset_states()
             test_mod = get_test()
@@ -260,7 +262,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
         else:
             w = clda[0]
             c = clda[1]
-            acc[2] = eval_lda(w, c, cnn.enc(x_test_cnn), np.argmax(y_test,axis=1,keepdims=True))
+            acc[2] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
     # test EWC
     if ewc is not None:

@@ -5,11 +5,10 @@ import numpy as np
 import copy as cp
 import matplotlib.pyplot as plt
 from IPython import display
-from adapt.ml.lda import eval_lda
 
 ## Encoders
 class MLPenc(Model):
-    def __init__(self, latent_dim=10, name='enc'):
+    def __init__(self, latent_dim=4, name='enc'):
         super(MLPenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
         self.bn1 = BatchNormalization()
@@ -31,7 +30,7 @@ class MLPenc(Model):
         return self.bn4(x)
 
 class EWCenc(Model):
-    def __init__(self, latent_dim=10, name='enc'):
+    def __init__(self, latent_dim=4, name='enc'):
         super(EWCenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
         self.bn1 = BatchNormalization()
@@ -58,7 +57,7 @@ class EWCenc(Model):
         return x
 
 class CNNenc(Model):
-    def __init__(self, latent_dim=10, c1=32, c2=32,name='enc'):
+    def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
         self.bn1 = BatchNormalization()
@@ -82,7 +81,7 @@ class CNNenc(Model):
         return self.bn4(x)
 
 class CNNbase(Model):
-    def __init__(self, latent_dim=10, c2=32,name='enc'):
+    def __init__(self, latent_dim=4, c2=32,name='enc'):
         super(CNNbase, self).__init__(name=name)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
         self.bn2 = BatchNormalization()
@@ -102,7 +101,7 @@ class CNNbase(Model):
         return self.bn4(x)
 
 class CNNtop(Model):
-    def __init__(self, latent_dim=10, c1=32, c2=32,name='enc'):
+    def __init__(self, c1=32, c2=32,name='enc'):
         super(CNNtop, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
         self.bn1 = BatchNormalization()
@@ -348,7 +347,7 @@ def get_train():
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
-                        y_out = eval_lda(clda[0],clda[1],mod.enc(x,training=True), np.argmax(y,axis=1,keepdims=True))
+                        y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
                         y_out = mod(x,training=True)
                 
