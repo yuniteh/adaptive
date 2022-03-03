@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC
+from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC, CNNenc
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -145,15 +145,29 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lam
     return loss, f_loss
 
 
-def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.001, align=False):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.001, align=False, bat=32, cnnlda=False):
     # Train NNs
+    w_c = None
     if traincnn is not None or trainmlp is not None:
         models = []
-        if mlp == None and trainmlp is not None:
-            mlp = MLP(n_class=n_dof)
+        if trainmlp is not None:
+            if mlp == None:
+                mlp = MLP(n_class=n_dof)
+            if y_train is not None:
+                mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
+            else:
+                mlp_ds = trainmlp
             models.append(mlp)
-        if cnn == None and traincnn is not None:
-            cnn = CNN(n_class=n_dof)
+        if traincnn is not None:
+            if cnn == None:
+                cnn = CNN(n_class=n_dof)
+            elif isinstance(cnn,CNN):
+                w_c = cnn[1:3]
+                cnn = cnn[0]
+            if y_train is not None:
+                cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
+            else:
+                cnn_ds = traincnn
             models.append(cnn)
         if align == True:
             mlp_ali = ALI()
@@ -169,20 +183,24 @@ def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=Non
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         for model in models:
             if isinstance(model,CNN):
-                ds = traincnn
+                ds = cnn_ds
             else:
-                ds = trainmlp
+                ds = mlp_ds
             
             train_mod = get_train()
 
+            print('training nn')
             for epoch in range(ep):
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
 
-                for x, y, _ in ds:
+                for x, y in ds:
                     if isinstance(model,CNN):
-                        train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
+                        if w_c is not None:
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c)
+                        else:
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
 
@@ -191,6 +209,12 @@ def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=Non
                         print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
             
             tf.keras.backend.clear_session()
+
+    if cnn is not None and cnnlda:
+        w_c,c_c, _, _, _ = train_lda(cnn.enc(traincnn),np.argmax(y_train, axis=1, keepdims=True))
+    else:
+        w_c=0
+        c_c=0
 
     # Train LDA
     if x_train_lda is not None:
@@ -203,9 +227,9 @@ def train_models(traincnn=None, trainmlp=None, x_train_lda=None, y_train_lda=Non
     if align:
         return mlp, cnn, mlp_ali, cnn_ali, w, c
     else:
-        return mlp, cnn, w, c
+        return mlp, cnn, w, c, w_c, c_c
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None):
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
@@ -227,11 +251,16 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
     
     # test CNN
     if cnn is not None:
-        test_loss.reset_states()
-        test_accuracy.reset_states()
-        test_mod = get_test()
-        test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy, align=cnn_align)
-        acc[2] = test_accuracy.result()*100
+        if clda is not None:
+            test_loss.reset_states()
+            test_accuracy.reset_states()
+            test_mod = get_test()
+            test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy, align=cnn_align)
+            acc[2] = test_accuracy.result()*100
+        else:
+            w = clda[0]
+            c = clda[1]
+            acc[2] = eval_lda(w, c, cnn.enc(x_test_cnn), np.argmax(y_test,axis=1,keepdims=True))
 
     # test EWC
     if ewc is not None:

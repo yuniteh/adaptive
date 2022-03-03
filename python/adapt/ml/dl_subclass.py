@@ -5,6 +5,7 @@ import numpy as np
 import copy as cp
 import matplotlib.pyplot as plt
 from IPython import display
+from adapt.ml.lda import eval_lda
 
 ## Encoders
 class MLPenc(Model):
@@ -82,7 +83,7 @@ class CNNenc(Model):
 
 class CNNbase(Model):
     def __init__(self, latent_dim=10, c2=32,name='enc'):
-        super(CNNenc, self).__init__(name=name)
+        super(CNNbase, self).__init__(name=name)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
         self.bn2 = BatchNormalization()
         self.flatten = Flatten()
@@ -102,7 +103,7 @@ class CNNbase(Model):
 
 class CNNtop(Model):
     def __init__(self, latent_dim=10, c1=32, c2=32,name='enc'):
-        super(CNNenc, self).__init__(name=name)
+        super(CNNtop, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
         self.bn1 = BatchNormalization()
 
@@ -332,7 +333,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0, clda=None):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -345,7 +346,11 @@ def get_train():
                         y_out = mod.clf(mod.base(mod.top(x,training=True),training=False),training=False)
                     # y_out = mod(align(x,training=True),training=False)
                 else:
-                    y_out = mod(x,training=True)
+                    if clda is not None:
+                        mod.clf.trainable = False
+                        y_out = eval_lda(clda[0],clda[1],mod.enc(x,training=True), np.argmax(y,axis=1,keepdims=True))
+                    else:
+                        y_out = mod(x,training=True)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
@@ -359,8 +364,12 @@ def get_train():
                 gradients = tape.gradient(loss, mod.top.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, mod.top.trainable_variables))
         else:
-            gradients = tape.gradient(loss, mod.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+            if clda is not None:
+                gradients = tape.gradient(loss, mod.enc.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
+            else:
+                gradients = tape.gradient(loss, mod.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
 
         if train_loss is not None:
             train_loss(loss)
