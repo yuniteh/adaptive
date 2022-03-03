@@ -10,8 +10,8 @@ import multiprocessing as mp
 
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False):
-    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(32)
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test, y_test, lams=[0], plot_loss=False, bat=128):
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
         _, ax = plt.subplots(len(lams),2,squeeze=False,figsize=(12,len(lams)*3.5))

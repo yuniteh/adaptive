@@ -8,7 +8,7 @@ from IPython import display
 
 ## Encoders
 class MLPenc(Model):
-    def __init__(self, latent_dim=4, name='enc'):
+    def __init__(self, latent_dim=10, name='enc'):
         super(MLPenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
         self.bn1 = BatchNormalization()
@@ -30,7 +30,7 @@ class MLPenc(Model):
         return self.bn4(x)
 
 class EWCenc(Model):
-    def __init__(self, latent_dim=4, name='enc'):
+    def __init__(self, latent_dim=10, name='enc'):
         super(EWCenc, self).__init__(name=name)
         self.dense1 = Dense(246, activation='relu')
         self.bn1 = BatchNormalization()
@@ -40,7 +40,7 @@ class EWCenc(Model):
         # self.dense4 = Dense(128, activation='relu')
         # self.dense5 = Dense(128, activation='relu')
         self.bn3 = BatchNormalization()
-        self.latent = Dense(4, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()
 
     def call(self, x):
@@ -57,7 +57,7 @@ class EWCenc(Model):
         return x
 
 class CNNenc(Model):
-    def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
+    def __init__(self, latent_dim=10, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
         self.bn1 = BatchNormalization()
@@ -79,6 +79,37 @@ class CNNenc(Model):
         x = self.bn3(x)
         x = self.latent(x)
         return self.bn4(x)
+
+class CNNbase(Model):
+    def __init__(self, latent_dim=10, c2=32,name='enc'):
+        super(CNNenc, self).__init__(name=name)
+        self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
+        self.bn2 = BatchNormalization()
+        self.flatten = Flatten()
+        self.dense1 = Dense(16, activation='relu')
+        self.bn3 = BatchNormalization()
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn4 = BatchNormalization()
+
+    def call(self, x):
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.flatten(x)
+        x = self.dense1(x)
+        x = self.bn3(x)
+        x = self.latent(x)
+        return self.bn4(x)
+
+class CNNtop(Model):
+    def __init__(self, latent_dim=10, c1=32, c2=32,name='enc'):
+        super(CNNenc, self).__init__(name=name)
+        self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
+        self.bn1 = BatchNormalization()
+
+    def call(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        return x
 
 ## Classifier
 class CLF(Model):
@@ -144,13 +175,21 @@ class MLPprop(Model):
         return y, prop
 
 class CNN(Model):
-    def __init__(self, n_class=7, c1=32, c2=32):
+    def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
         super(CNN, self).__init__()
-        self.enc = CNNenc(c1=c1,c2=c2)
+        if adapt:
+            self.top = CNNtop(c1=c1)
+            self.base = CNNbase(c2=c2)
+        else:
+            self.enc = CNNenc(c1=c1,c2=c2)
         self.clf = CLF(n_class)
     
     def call(self, x):
-        x = self.enc(x)
+        if hasattr(self,'top'):
+            x = self.top(x)
+            x = self.base(x)
+        else:
+            x = self.enc(x)
         y = self.clf(x)
         return y
   
@@ -168,12 +207,16 @@ class CNNprop(Model):
         return y, prop
 
 class EWC(Model):
-    def __init__(self, n_class=7, mod='MLP'):
+    def __init__(self, n_class=7, mod='MLP', adapt=False):
         super(EWC, self).__init__()
         if mod == 'MLP':
             self.enc = EWCenc()
         else:
-            self.enc = CNNenc()
+            if adapt:
+                self.top = CNNtop()
+                self.base = CNNbase()
+            else:
+                self.enc = CNNenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):
@@ -184,7 +227,11 @@ class EWC(Model):
         return val_acc.result()
     
     def call(self, x):
-        x = self.enc(x)
+        if hasattr(self,'top'):
+            x = self.top(x)
+            x = self.base(x)
+        else:
+            x = self.enc(x)
         return self.clf(x)
 
     def compute_fisher(self, imgset, y, num_samples=200, plot_diffs=False, disp_freq=10):
@@ -294,7 +341,9 @@ def get_train():
                 loss = class_loss + prop_loss/10
             else:
                 if align is not None:
-                    y_out = mod(align(x,training=True),training=False)
+                    if align:
+                        y_out = mod.clf(mod.base(mod.top(x,training=True),training=False),training=False)
+                    # y_out = mod(align(x,training=True),training=False)
                 else:
                     y_out = mod(x,training=True)
                 
@@ -306,8 +355,9 @@ def get_train():
                         loss += f_loss             
         
         if align is not None:
-            gradients = tape.gradient(loss, align.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, align.trainable_variables))
+            if align:
+                gradients = tape.gradient(loss, mod.top.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.top.trainable_variables))
         else:
             gradients = tape.gradient(loss, mod.trainable_variables)
             optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
@@ -327,7 +377,8 @@ def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
         if align is not None:
-            y_out = mod(align(x))
+            # y_out = mod(align(x))
+            y_out = mod(x)
         else:
             y_out = mod(x)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
