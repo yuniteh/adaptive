@@ -5,6 +5,7 @@ import numpy as np
 import copy as cp
 import matplotlib.pyplot as plt
 from IPython import display
+from collections import deque
 
 ## Encoders
 class MLPenc(Model):
@@ -277,17 +278,51 @@ class EWC(Model):
             self.F_accum[v] /= num_samples
         
         if not hasattr(self,"F_old"):
-            self.F_old = cp.deepcopy(self.F_accum)
-            self.int = 1
+            self.F_old = []
+            for v in range(4):
+                f_temp = []
+                for v in range(len(self.trainable_weights)):
+                    f_temp.append(np.zeros(self.trainable_weights[v].get_shape().as_list()))
+                self.F_old.append(f_temp)
+            self.int = 0
+
+            self.F_old[0] = cp.deepcopy(self.F_accum)
         else:
             # if self.equal:
             #     for v in range(len(self.F_accum)):
             #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/2
             # else:
             self.int += 1
-            for v in range(len(self.F_accum)):
-                self.F_accum[v] = (self.F_accum[v] + self.F_old[v])#/self.int
-            self.F_old = cp.deepcopy(self.F_accum)
+            self.F_old = deque(self.F_old)
+            self.F_old.rotate(1)
+            self.F_old = list(self.F_old)
+            # self.F_old = tf.roll(self.F_old,shift=1,axis=0)
+            self.F_old[0] = cp.deepcopy(self.F_accum)
+            
+            if self.int == 1:
+                lam = [2, 0, 0, 0]
+            elif self.int == 2:
+                lam = [1, 1, 0, 0]
+            elif self.int == 3:
+                lam = [1, .6, .4, 0]
+            else:
+                lam = [1, .6, .3, .1]
+                
+            self.F_init = []
+            for v in range(len(self.trainable_weights)):
+                self.F_accum[v] = np.zeros(self.trainable_weights[v].get_shape().as_list())
+            
+            # print(self.F_init.shape())
+            # print(self.F_old.shape())
+            # print(self.F_accum.shape())
+
+            for v in range(len(self.F_old)):
+                for vi in range(len(self.F_accum)):
+                    self.F_accum[vi] = self.F_accum[vi] + lam[v]*self.F_old[v][vi]/2
+            # for v in range(len(self.F_accum)):
+            #     for vi in range(len(self.F_old)):
+            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
+            # self.F_old = cp.deepcopy(self.F_accum)
 
 
     def star(self):
@@ -323,7 +358,7 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=False)
+            y_out = mod(x,training=True)
             c_index = tf.argmax(y_out,1)[0]
             if y is not None:
                 loss = -tf.math.log(y_out[0,c_index])
@@ -358,8 +393,11 @@ def get_train():
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
+                    # for v in range(len(mod.F_accum)):
+                    #     mod.F_accum[v] = mod.F_accum[v]/(0.001*lam*mod.F_accum[v] + 1)
                     for v in range(len(mod.trainable_weights)):
-                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))   
+                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                         loss += f_loss             
         
         if align is not None:
@@ -374,10 +412,12 @@ def get_train():
                 gradients = tape.gradient(loss, mod.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
 
+        # print(gradients)
+
         if train_loss is not None:
             train_loss(loss)
         if fish_loss is not None and hasattr(mod,"F_accum"):
-            fish_loss(f_loss)
+            fish_loss(f_loss_orig)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:
