@@ -358,7 +358,7 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=True)
+            y_out = mod(x,training=False)
             c_index = tf.argmax(y_out,1)[0]
             if y is not None:
                 loss = -tf.math.log(y_out[0,c_index])
