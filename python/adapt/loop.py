@@ -83,19 +83,19 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             ## weight cycling
             if lams[l] != 0:
                 ratio = (train_loss.result()/fish_loss.result()).numpy()
-                if iter < 10:
-                    lam_in = 0
-                    optimizer.learning_rate = 0.0001
-                    # lam_in = lams[l]
-                else:
+                # if iter < 10:
+                #     lam_in = 0
+                #     optimizer.learning_rate = 0.0001
+                #     # lam_in = lams[l]
+                # else:
                     # if train_loss.result().numpy() < 1:
                     #     if ratio > 50:
                     #         lam_in = 50
                     #     else:
                     #         lam_in = ratio
                     # else:
-                    lam_in = lams[l]
-                    optimizer.learning_rate = 0.000001
+                lam_in = lams[l]
+                optimizer.learning_rate = 0.000001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
                 # optimizer.learning_rate = 0.0001
