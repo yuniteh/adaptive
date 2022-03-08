@@ -160,8 +160,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                     print('early stop fish')
                     break
 
-            if lams[l] > 0:
-                print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
+            # if lams[l] > 0:
+            #     print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
 
         x_train1 = x_train[:x_train.shape[0]//2,...]
         x_train2 = x_train[x_train.shape[0]//2:,...]
