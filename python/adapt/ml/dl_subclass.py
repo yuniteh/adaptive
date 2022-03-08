@@ -5,6 +5,7 @@ import numpy as np
 import copy as cp
 import matplotlib.pyplot as plt
 from IPython import display
+from collections import deque
 
 ## Encoders
 class MLPenc(Model):
@@ -32,28 +33,28 @@ class MLPenc(Model):
 class EWCenc(Model):
     def __init__(self, latent_dim=4, name='enc'):
         super(EWCenc, self).__init__(name=name)
-        self.dense1 = Dense(128, activation='relu')
-        # self.bn1 = BatchNormalization()
-        self.dense2 = Dense(64, activation='relu')
-        # self.bn2 = BatchNormalization()
+        self.dense1 = Dense(246, activation='relu')
+        self.bn1 = BatchNormalization()
+        self.dense2 = Dense(128, activation='relu')
+        self.bn2 = BatchNormalization()
         self.dense3 = Dense(16, activation='relu')
         # self.dense4 = Dense(128, activation='relu')
         # self.dense5 = Dense(128, activation='relu')
-        # self.bn3 = BatchNormalization()
-        self.latent = Dense(4, activation='relu')#, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        # self.bn4 = BatchNormalization()
+        self.bn3 = BatchNormalization()
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn4 = BatchNormalization()
 
     def call(self, x):
         x = self.dense1(x)
-        # x = self.bn1(x)
+        x = self.bn1(x)
         x = self.dense2(x)
-        # x = self.bn2(x)
+        x = self.bn2(x)
         x = self.dense3(x)
-        # x = self.bn3(x)
+        x = self.bn3(x)
         # x = self.dense4(x)
         # x = self.dense5(x)
         x = self.latent(x)
-        # x = self.bn4(x)
+        x = self.bn4(x)
         return x
 
 class CNNenc(Model):
@@ -79,6 +80,37 @@ class CNNenc(Model):
         x = self.bn3(x)
         x = self.latent(x)
         return self.bn4(x)
+
+class CNNbase(Model):
+    def __init__(self, latent_dim=4, c2=32,name='enc'):
+        super(CNNbase, self).__init__(name=name)
+        self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
+        self.bn2 = BatchNormalization()
+        self.flatten = Flatten()
+        self.dense1 = Dense(16, activation='relu')
+        self.bn3 = BatchNormalization()
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn4 = BatchNormalization()
+
+    def call(self, x):
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.flatten(x)
+        x = self.dense1(x)
+        x = self.bn3(x)
+        x = self.latent(x)
+        return self.bn4(x)
+
+class CNNtop(Model):
+    def __init__(self, c1=32, c2=32,name='enc'):
+        super(CNNtop, self).__init__(name=name)
+        self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
+        self.bn1 = BatchNormalization()
+
+    def call(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        return x
 
 ## Classifier
 class CLF(Model):
@@ -111,9 +143,11 @@ class MLP(Model):
 class ALI(Model):
     def __init__(self, n=32, name='aligner'):
         super(ALI, self).__init__(name=name)
-        self.dense1 = Dense(64, activation='relu')
+        self.dense1 = Dense(128, activation='relu')
         self.bn1 = BatchNormalization()
-        self.dense2 = Dense(n, activation='relu')
+        self.dense2 = Dense(64, activation='relu')
+        self.bn2 = BatchNormalization()
+        self.dense3 = Dense(n, activation='relu')
 
     def call(self,x):
         in_shape = x.shape
@@ -121,6 +155,8 @@ class ALI(Model):
         x = self.dense1(x)
         x = self.bn1(x)
         x = self.dense2(x)
+        x = self.bn2(x)
+        x = self.dense3(x)
         if len(in_shape) > 2:
             x = tf.reshape(x,in_shape)
         return x
@@ -140,13 +176,21 @@ class MLPprop(Model):
         return y, prop
 
 class CNN(Model):
-    def __init__(self, n_class=7, c1=32, c2=32):
+    def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
         super(CNN, self).__init__()
-        self.enc = CNNenc(c1=c1,c2=c2)
+        if adapt:
+            self.top = CNNtop(c1=c1)
+            self.base = CNNbase(c2=c2)
+        else:
+            self.enc = CNNenc(c1=c1,c2=c2)
         self.clf = CLF(n_class)
     
     def call(self, x):
-        x = self.enc(x)
+        if hasattr(self,'top'):
+            x = self.top(x)
+            x = self.base(x)
+        else:
+            x = self.enc(x)
         y = self.clf(x)
         return y
   
@@ -164,9 +208,16 @@ class CNNprop(Model):
         return y, prop
 
 class EWC(Model):
-    def __init__(self, n_class=7):
+    def __init__(self, n_class=7, mod='MLP', adapt=False):
         super(EWC, self).__init__()
-        self.enc = EWCenc()
+        if mod == 'MLP':
+            self.enc = EWCenc()
+        else:
+            if adapt:
+                self.top = CNNtop()
+                self.base = CNNbase()
+            else:
+                self.enc = CNNenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):
@@ -177,7 +228,11 @@ class EWC(Model):
         return val_acc.result()
     
     def call(self, x):
-        x = self.enc(x)
+        if hasattr(self,'top'):
+            x = self.top(x)
+            x = self.base(x)
+        else:
+            x = self.enc(x)
         return self.clf(x)
 
     def compute_fisher(self, imgset, y, num_samples=200, plot_diffs=False, disp_freq=10):
@@ -213,36 +268,84 @@ class EWC(Model):
                     for v in range(len(self.F_accum)):
                         F_prev[v] = self.F_accum[v]/(i+1)
 
-        plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
-        plt.xlabel("Number of samples")
-        plt.ylabel("Mean absolute Fisher difference")
+        if plot_diffs:
+            plt.plot(range(0, num_samples-disp_freq, disp_freq), mean_diffs)
+            plt.xlabel("Number of samples")
+            plt.ylabel("Mean absolute Fisher difference")
 
         # divide totals by number of samples
         for v in range(len(self.F_accum)):
             self.F_accum[v] /= num_samples
         
         if not hasattr(self,"F_old"):
-            self.F_old = cp.deepcopy(self.F_accum)
-            self.int = 1
-        else:  
+            self.F_old = []
+            for v in range(4):
+                f_temp = []
+                for v in range(len(self.trainable_weights)):
+                    f_temp.append(np.zeros(self.trainable_weights[v].get_shape().as_list()))
+                self.F_old.append(f_temp)
+            self.int = 0
+
+            self.F_old[0] = cp.deepcopy(self.F_accum)
+        else:
+            # if self.equal:
+            #     for v in range(len(self.F_accum)):
+            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/2
+            # else:
             self.int += 1
-            for v in range(len(self.F_accum)):
-                self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/self.int
-            self.F_old = cp.deepcopy(self.F_accum)
+            self.F_old = deque(self.F_old)
+            self.F_old.rotate(1)
+            self.F_old = list(self.F_old)
+            # self.F_old = tf.roll(self.F_old,shift=1,axis=0)
+            self.F_old[0] = cp.deepcopy(self.F_accum)
+            
+            if self.int == 1:
+                lam = [2, 0, 0, 0]
+            elif self.int == 2:
+                lam = [1, 1, 0, 0]
+            elif self.int == 3:
+                lam = [1, .6, .4, 0]
+            else:
+                lam = [1, .6, .3, .1]
+                
+            self.F_init = []
+            for v in range(len(self.trainable_weights)):
+                self.F_accum[v] = np.zeros(self.trainable_weights[v].get_shape().as_list())
+            
+            # print(self.F_init.shape())
+            # print(self.F_old.shape())
+            # print(self.F_accum.shape())
+
+            for v in range(len(self.F_old)):
+                for vi in range(len(self.F_accum)):
+                    self.F_accum[vi] = self.F_accum[vi] + lam[v]*self.F_old[v][vi]/2
+            # for v in range(len(self.F_accum)):
+            #     for vi in range(len(self.F_old)):
+            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
+            # self.F_old = cp.deepcopy(self.F_accum)
 
 
     def star(self):
         # used for saving optimal weights after most recent task training
         self.star_vars = []
+        self.all_vars = []
 
         for v in range(len(self.trainable_weights)):
             self.star_vars.append(cp.deepcopy(self.trainable_weights[v].numpy()))
+        
+        for v in range(len(self.non_trainable_weights)):
+            self.all_vars.append(cp.deepcopy(self.non_trainable_weights[v].numpy()))
+        # self.all_vars = cp.deepcopy(self.get_weights())
 
     def restore(self):
         # reassign optimal weights for latest task
         if hasattr(self, "star_vars"):
             for v in range(len(self.trainable_weights)):
                 self.trainable_weights[v].assign(self.star_vars[v])
+            
+            for v in range(len(self.non_trainable_weights)):
+                self.non_trainable_weights[v].assign(self.all_vars[v])
+            # self.set_weights(self.all_vars)
 
 def eval_nn(x, y, mod, clean):
     y_pred = np.argmax(mod(x).numpy(),axis=1)
@@ -255,7 +358,7 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=True)
+            y_out = mod(x,training=False)
             c_index = tf.argmax(y_out,1)[0]
             if y is not None:
                 loss = -tf.math.log(y_out[0,c_index])
@@ -268,7 +371,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0, clda=None):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -277,24 +380,44 @@ def get_train():
                 loss = class_loss + prop_loss/10
             else:
                 if align is not None:
-                    y_out = mod(align(x,training=True),training=False)
+                    if align:
+                        y_out = mod.clf(mod.base(mod.top(x,training=True),training=False),training=False)
+                    # y_out = mod(align(x,training=True),training=False)
                 else:
-                    y_out = mod(x,training=True)
+                    if clda is not None:
+                        mod.clf.trainable = False
+                        y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
+                    else:
+                        y_out = mod(x,training=True)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
+                    # for v in range(len(mod.F_accum)):
+                    #     mod.F_accum[v] = mod.F_accum[v]/(0.001*lam*mod.F_accum[v] + 1)
                     for v in range(len(mod.trainable_weights)):
-                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))   
+                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                         loss += f_loss             
-            
-        gradients = tape.gradient(loss, mod.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+        
+        if align is not None:
+            if align:
+                gradients = tape.gradient(loss, mod.top.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.top.trainable_variables))
+        else:
+            if clda is not None:
+                gradients = tape.gradient(loss, mod.enc.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
+            else:
+                gradients = tape.gradient(loss, mod.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+
+        # print(gradients)
 
         if train_loss is not None:
             train_loss(loss)
         if fish_loss is not None and hasattr(mod,"F_accum"):
-            fish_loss(f_loss)
+            fish_loss(f_loss_orig)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:
@@ -306,7 +429,8 @@ def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
         if align is not None:
-            y_out = mod(align(x))
+            # y_out = mod(align(x))
+            y_out = mod(x)
         else:
             y_out = mod(x)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
