@@ -60,12 +60,12 @@ class EWCenc(Model):
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
-        self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
+        self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
-        self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
+        self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
         self.flatten = Flatten()
-        self.dense1 = Dense(16, activation='relu')
+        self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn3 = BatchNormalization()
         self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()
@@ -116,7 +116,7 @@ class CNNtop(Model):
 class CLF(Model):
     def __init__(self, n_class=7, act='softmax', name='clf'):
         super(CLF, self).__init__(name=name)
-        self.dense1 = Dense(n_class, activation=act)
+        self.dense1 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5))
 
     def call(self, x):
         return self.dense1(x)
@@ -301,12 +301,20 @@ class EWC(Model):
             
             if self.int == 1:
                 lam = [2, 0, 0, 0]
+            # elif self.int == 2:
+            #     lam = [1, 1, 0, 0]
+            # elif self.int == 3:
+            #     lam = [1, .6, .4, 0]
+            # else:
+            #     lam = [1, .6, .3, .1]
             elif self.int == 2:
-                lam = [1, 1, 0, 0]
+                lam = [2, 2, 0, 0]
             elif self.int == 3:
-                lam = [1, .6, .4, 0]
+                lam = [2, 2, 2, 0]
             else:
-                lam = [1, .6, .3, .1]
+                lam = [2, 2, 2, 2]
+            
+            lam = [1,1,1,1]
                 
             self.F_init = []
             for v in range(len(self.trainable_weights)):
@@ -318,7 +326,7 @@ class EWC(Model):
 
             for v in range(len(self.F_old)):
                 for vi in range(len(self.F_accum)):
-                    self.F_accum[vi] = self.F_accum[vi] + lam[v]*self.F_old[v][vi]/2
+                    self.F_accum[vi] = self.F_accum[vi] + lam[v]*self.F_old[v][vi]#/2
             # for v in range(len(self.F_accum)):
             #     for vi in range(len(self.F_old)):
             #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
