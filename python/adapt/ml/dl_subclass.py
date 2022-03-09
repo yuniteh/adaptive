@@ -330,9 +330,9 @@ class EWC(Model):
             # for v in range(len(self.F_accum)):
             #     for vi in range(len(self.F_old)):
             #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
-            for v in range(len(self.F_old)):
-                for vi in range(len(self.F_accum)):
-                    self.F_accum[vi] = self.F_accum[vi] + self.F_old[v][vi]#/2
+            # for v in range(len(self.F_old)):
+            for vi in range(len(self.F_accum)):
+                self.F_accum[vi] = self.F_accum[vi] + self.F_old[vi]
             self.F_old = cp.deepcopy(self.F_accum)
 
 

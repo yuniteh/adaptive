@@ -83,23 +83,23 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             ## weight cycling
             if lams[l] != 0:
                 ratio = (train_loss.result()/fish_loss.result()).numpy()
-                if iter < 5:
-                    if ratio < 100:
-                        lam_in = ratio
-                    else:                      
-                        lam_in = 100
-                    optimizer.learning_rate = 0.000001
-                # #     optimizer.learning_rate = 0.0001
-                # # #     # lam_in = lams[l]
-                # # else:
-                #     # if train_loss.result().numpy() < 1:
-                #     #     if ratio > 50:
-                #     #         lam_in = 50
-                #     #     else:
-                #     #         lam_in = ratio
-                else:
-                    lam_in = lams[l]
-                    optimizer.learning_rate = 0.000001
+                # if iter < 5:
+                #     if ratio < 50:
+                #         lam_in = ratio
+                #     else:                      
+                #         lam_in = 50
+                #     optimizer.learning_rate = 0.000001
+                # # #     optimizer.learning_rate = 0.0001
+                # # # #     # lam_in = lams[l]
+                # # # else:
+                # #     # if train_loss.result().numpy() < 1:
+                # #     #     if ratio > 50:
+                # #     #         lam_in = 50
+                # #     #     else:
+                # #     #         lam_in = ratio
+                # else:
+                lam_in = lams[l]
+                optimizer.learning_rate = 0.000001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
                 # optimizer.learning_rate = 0.0001
@@ -289,8 +289,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         del traincnn 
         x_lda = np.vstack((cnn.enc(x_train1).numpy(),cnn.enc(x_train2).numpy(),cnn.enc(x_train3).numpy(),cnn.enc(x_train4).numpy()))
         y_lda = np.vstack((y_train[:y_train.shape[0]//4,...], y_train[y_train.shape[0]//4:y_train.shape[0]//2,...],y_train[:y_train.shape[0]//2:3*y_train.shape[0]//4,...],y_train[3*y_train.shape[0]//4:,...]))
-        # x_lda = cnn.enc(traincnn).numpy()
-        # y_lda = y_train
         w_c,c_c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
         w_c = w_c.astype('float32')
         c_c = c_c.astype('float32')
