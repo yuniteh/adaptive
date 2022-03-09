@@ -83,12 +83,12 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             ## weight cycling
             if lams[l] != 0:
                 ratio = (train_loss.result()/fish_loss.result()).numpy()
-                # if iter < 5:
-                #     if ratio < 100:
-                #         lam_in = ratio
-                #     else:
-                #         lam_in = 100
-                #     optimizer.learning_rate = 0.000001
+                if iter < 5:
+                    if ratio < 100:
+                        lam_in = ratio
+                    else:                      
+                        lam_in = 100
+                    optimizer.learning_rate = 0.000001
                 # #     optimizer.learning_rate = 0.0001
                 # # #     # lam_in = lams[l]
                 # # else:
@@ -97,9 +97,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 #     #         lam_in = 50
                 #     #     else:
                 #     #         lam_in = ratio
-                # else:
-                lam_in = lams[l]
-                optimizer.learning_rate = 0.000001
+                else:
+                    lam_in = lams[l]
+                    optimizer.learning_rate = 0.000001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
                 # optimizer.learning_rate = 0.0001
@@ -145,10 +145,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                     test_accs[task][int(iter/disp_freq)+1] = val_accuracy.result()
 
             # early stopping criteria
-            # if lams[l] > 0:
-            #     print(train_last)
-            #     print(fish_last)
-            #     print('---')
             train_diff = train_last - train_loss.result()
             train_last = cp.deepcopy(train_loss.result().numpy())
             fish_diff = fish_last - fish_loss.result()
@@ -173,7 +169,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
         w, c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
 
-        # print(f'Final', end=' '),
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
             if task != len(x_test)-1:
