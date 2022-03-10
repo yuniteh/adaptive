@@ -35,7 +35,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00005,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -98,7 +98,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 # #     #     else:
                 # #     #         lam_in = ratio
                 # else:
-                lam_in = lams[l]
+                lam_in = 0#lams[l]
                 optimizer.learning_rate = 0.000001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
