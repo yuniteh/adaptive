@@ -32,7 +32,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         
         if lams[l] == 0:
             # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001,clipvalue=.5)
@@ -69,8 +69,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             fish_loss.reset_states()
             val_accuracy.reset_states()
 
-            if iter == 0 and lams[l] > 0:
-                lam_in = 1
+            # if iter == 0 and lams[l] > 0:
+            #     lam_in = 1
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda)
@@ -101,7 +101,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 # #     #         lam_in = ratio
                 # else:
                 lam_in = lams[l]
-                optimizer.learning_rate = 0.000001
+                optimizer.learning_rate = 0.00001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
                 # optimizer.learning_rate = 0.0001
@@ -155,14 +155,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 print('early stop')
                 break
             
-            if lams[l] > 0:
-                if np.abs(train_diff) < 5e-2 and fish_diff < 0:
-                    print('early stop')
-                # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
-                #     # print(str(fish_loss.result().numpy()))
-                #     # print(str(train_loss.result().numpy()))
-                #     print('early stop fish')
-                    break
+            # if lams[l] > 0:
+            #     if np.abs(train_diff) < 5e-2 and fish_diff < 0:
+            #         print('early stop')
+            #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
+            #     #     # print(str(fish_loss.result().numpy()))
+            #     #     # print(str(train_loss.result().numpy()))
+            #     #     print('early stop fish')
+            #         break
 
             if lams[l] > 0:
                 print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
