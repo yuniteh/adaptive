@@ -332,7 +332,7 @@ class EWC(Model):
             #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
             # for v in range(len(self.F_old)):
             for vi in range(len(self.F_accum)):
-                self.F_accum[vi] = self.F_accum[vi]# + self.F_old[vi]
+                self.F_accum[vi] = self.F_accum[vi] + self.F_old[vi]
             self.F_old = cp.deepcopy(self.F_accum)
 
 
@@ -371,7 +371,7 @@ def get_fish():
         with tf.GradientTape() as tape:
             y_out = mod(x,training=False)
             c_index = tf.argmax(y_out,1)[0]
-            if y is not None:
+            if y is None:
                 loss = -tf.math.log(y_out[0,c_index])
             else:
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
