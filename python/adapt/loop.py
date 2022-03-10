@@ -171,7 +171,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         x_train2 = x_train[x_train.shape[0]//2:,...]
         x_lda = np.vstack((model.enc(x_train1).numpy(),model.enc(x_train2).numpy()))
         y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
-        w, c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        w, c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
 
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
@@ -250,8 +250,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             cnn_ali = None
 
         optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
-        # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         for model in models:
@@ -301,12 +299,11 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
 
     # Train LDA
     if x_train_lda is not None:
-        w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+        w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
     else:
         w=0
         c=0
 
-    # print(align)
     if align:
         return mlp, cnn, mlp_ali, cnn_ali, w, c
     else:
