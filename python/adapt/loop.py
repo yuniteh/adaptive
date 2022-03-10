@@ -32,10 +32,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         
         if lams[l] == 0:
             # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00001,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -101,7 +101,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 # #     #         lam_in = ratio
                 # else:
                 lam_in = lams[l]
-                optimizer.learning_rate = 0.00001
+                optimizer.learning_rate = 0.000001
                 # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
                 # print(lam_in)
                 # optimizer.learning_rate = 0.0001
@@ -234,7 +234,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         if traincnn is not None:
             if cnn == None:
                 cnn = CNN(n_class=n_dof)
-            
             elif not isinstance(cnn,CNN):
                 w_c = cnn[1:3]
                 cnn = cnn[0]

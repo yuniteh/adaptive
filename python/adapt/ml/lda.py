@@ -19,7 +19,7 @@ def eval_lda(w, c, x_test, y_test, clean_size=None):
         return acc
 
 # train LDA classifier for data: (samples,feat), label: (samples, 1)
-def train_lda(data,label,mu_bool=False, mu_class = 0, C = 0):
+def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = data.shape[1]
@@ -32,11 +32,15 @@ def train_lda(data,label,mu_bool=False, mu_class = 0, C = 0):
         mu_class = np.zeros([n_class,m])
         Sb = np.zeros([mu.shape[1],mu.shape[1]])
         Sw = np.zeros([mu.shape[1],mu.shape[1]])
+        N = np.zeros((n_class))
+        cov_class = []
 
         for i in range(0,n_class):
             ind = label == u_class[i]
+            N[i] = np.sum(np.squeeze(ind))
             mu_class[i,:] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
-            C += np.cov(data[ind[:,0],:].T)
+            cov_class[i] = np.cov(data[ind[:,0],:].T)
+            C += cov_class[i]
             Sb += ind.shape[0] * np.dot((mu_class[np.newaxis,i,:] - mu).T,(mu_class[np.newaxis,i,:] - mu)) 
 
             Sw_temp = np.zeros([mu.shape[1],mu.shape[1]])
@@ -58,9 +62,44 @@ def train_lda(data,label,mu_bool=False, mu_class = 0, C = 0):
         c[i,:] = np.dot(-.5 * np.dot(mu_class[np.newaxis,i,:], np.linalg.pinv(C)),mu_class[np.newaxis,i,:].T) + np.log(prior)    
 
     if not mu_bool:
-        return w, c, mu_class, C, v
+        return w, c, mu_class, C, v, N, cov_class
     else:
         return w, c
+
+# train LDA classifier for data: (samples,feat), label: (samples, 1)
+def update_lda(data,label,N,mu_class,cov_class):
+    if not isinstance(data,np.ndarray):
+        data = data.numpy()
+    m = data.shape[1]
+    u_class = np.unique(label)
+    n_class = u_class.shape[0]
+    ALPHA = np.zeros(N.shape)
+    N_new = np.zeros((n_class,))
+
+    for i in range(0, n_class):
+        ind = np.squeeze(label == u_class[i])
+        N_new[i] = np.sum(ind)
+        ALPHA[i] = N[i] / (N[i] + N_new[i])
+        zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
+        mu_class[i,...] = ALPHA * mu_class[i,...] + (1 - ALPHA) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+        zero_mean_feats_new = data[ind,...] - mu_class[i,...]                                # De-mean based on the updated mean value
+        point_cov = np.dot(zero_mean_feats_old.T, zero_mean_feats_new)
+        cov_class[i] = ALPHA * cov_class[i] + (1 - ALPHA) * point_cov                      # Update the covariance
+        C += cov_class[i]
+
+        N[i] += N_new[i]
+
+    C /= n_class
+    prior = 1/n_class
+
+    w = np.zeros([n_class, m])
+    c = np.zeros([n_class, 1])
+
+    for i in range(0, n_class):
+        w[i,:] = np.dot(mu_class[np.newaxis,i,:],np.linalg.pinv(C))
+        c[i,:] = np.dot(-.5 * np.dot(mu_class[np.newaxis,i,:], np.linalg.pinv(C)),mu_class[np.newaxis,i,:].T) + np.log(prior)    
+
+    return w, c, mu_class, cov_class, N
 
 def predict(data,w,c):
     f = np.dot(w,data.T) + c
