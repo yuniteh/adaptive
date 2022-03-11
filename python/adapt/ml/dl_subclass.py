@@ -283,60 +283,9 @@ class EWC(Model):
             self.F_accum[v] /= num_samples
         
         if not hasattr(self,"F_old"):
-            # self.F_old = []
-            # for v in range(4):
-            #     f_temp = []
-            #     for v in range(len(self.trainable_weights)):
-            #         f_temp.append(np.zeros(self.trainable_weights[v].get_shape().as_list()))
-            #     self.F_old.append(f_temp)
-            # self.int = 0
-
             self.F_old = cp.deepcopy(self.F_accum)
             self.int = 1
         else:
-            # if self.equal:
-            #     for v in range(len(self.F_accum)):
-            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v])/2
-            # else:
-            # self.int += 1
-            # self.F_old = deque(self.F_old)
-            # self.F_old.rotate(1)
-            # self.F_old = list(self.F_old)
-            # # self.F_old = tf.roll(self.F_old,shift=1,axis=0)
-            # self.F_old[0] = cp.deepcopy(self.F_accum)
-            
-            # if self.int == 1:
-            #     lam = [2, 0, 0, 0]
-            # # elif self.int == 2:
-            # #     lam = [1, 1, 0, 0]
-            # # elif self.int == 3:
-            # #     lam = [1, .6, .4, 0]
-            # # else:
-            # #     lam = [1, .6, .3, .1]
-            # elif self.int == 2:
-            #     lam = [2, 2, 0, 0]
-            # elif self.int == 3:
-            #     lam = [2, 2, 2, 0]
-            # else:
-            #     lam = [2, 2, 2, 2]
-            
-            # lam = [1,1,1,1]
-                
-            # self.F_init = []
-            # for v in range(len(self.trainable_weights)):
-            #     self.F_accum[v] = np.zeros(self.trainable_weights[v].get_shape().as_list())
-            
-            # print(self.F_init.shape())
-            # print(self.F_old.shape())
-            # print(self.F_accum.shape())
-
-            # for v in range(len(self.F_old)):
-            #     for vi in range(len(self.F_accum)):
-            #         self.F_accum[vi] = self.F_accum[vi] + lam[v]*self.F_old[v][vi]#/2
-            # for v in range(len(self.F_accum)):
-            #     for vi in range(len(self.F_old)):
-            #         self.F_accum[v] = (self.F_accum[v] + self.F_old[v]/self.int)#/self.int
-            # for v in range(len(self.F_old)):
             for vi in range(len(self.F_accum)):
                 self.F_accum[vi] = self.F_accum[vi] + self.F_old[vi]
             self.F_old = cp.deepcopy(self.F_accum)
