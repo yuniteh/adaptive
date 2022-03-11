@@ -86,56 +86,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             ## weight cycling
             if lams[l] != 0:
                 ratio = (train_loss.result()/fish_loss.result()).numpy()
-                # if iter < 5:
-                #     if ratio < 50:
-                #         lam_in = ratio
-                #     else:                      
-                #         lam_in = 50
-                #     optimizer.learning_rate = 0.000001
-                # # #     optimizer.learning_rate = 0.0001
-                # # # #     # lam_in = lams[l]
-                # # # else:
-                # #     # if train_loss.result().numpy() < 1:
-                # #     #     if ratio > 50:
-                # #     #         lam_in = 50
-                # #     #     else:
-                # #     #         lam_in = ratio
-                # else:
                 lam_in = lams[l]
                 optimizer.learning_rate = 0.000001
-                # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
-                # print(lam_in)
-                # optimizer.learning_rate = 0.0001
-                
-                # if train_loss.result().numpy() > 1 and iter < 10:
-                #     lam_in = 0
-                #     optimizer.learning_rate = 0.0001
-                # elif train_loss.result().numpy() < 0.5:
-                #     lam_in = lams[l]*2
-                # else:
-                #     lam_in = lams[l]
-                # if train_loss.result().numpy() < 1:# or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
-                #     # lam_in = lams[l]
-                #     ratio = (train_loss.result()/fish_loss.result()).numpy()
-                #     optimizer.learning_rate = 0.00001
-                #     if fish_loss.result().numpy() > 1e-5:
-                #         if train_loss.result().numpy() > 0.7:
-                #             lam_in = ratio/10
-                #         elif train_loss.result().numpy() > 0.5:
-                #             lam_in = ratio/5
-                #         elif ratio > 50000:
-                #             lam_in = 50000/2
-                #             optimizer.learning_rate = 0.000001
-                #         else:
-                #             lam_in = ratio/2
-                #     else:
-                #         lam_in = lams[l]
-                # else:
-                #     lam_in = 0
-                #     optimizer.learning_rate = 0.001
-
-            # if lams[l] < 0 and f_loss[iter,l] != 0:
-            #     lam_in = np.float32(loss[iter,l]/f_loss[iter,l])
+               
             
             lams_all[int(iter/disp_freq)+1,l] = lam_in
 
