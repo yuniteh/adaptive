@@ -61,14 +61,14 @@ class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn1 = BatchNormalization()
+        self.bn1 = BatchNormalization(renorm=True)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn2 = BatchNormalization()
+        self.bn2 = BatchNormalization(renorm=True)
         self.flatten = Flatten()
         self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn3 = BatchNormalization()
+        self.bn3 = BatchNormalization(renorm=True)
         self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()
+        self.bn4 = BatchNormalization(renorm=True)
 
     def call(self, x, training=False, trainable=False):
         self.bn1.trainable = trainable
