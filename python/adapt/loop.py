@@ -33,10 +33,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         
         if lams[l] == 0:
             # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -70,8 +70,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             fish_loss.reset_states()
             val_accuracy.reset_states()
 
-            # if iter == 0 and lams[l] > 0:
-            #     lam_in = 1
+            if iter == 0 and lams[l] > 0:
+                lam_in = 1
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda, trainable=False)
@@ -156,14 +156,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 print('early stop')
                 break
             
-            # if lams[l] > 0:
-            #     if np.abs(train_diff) < 5e-2 and fish_diff < 0:
-            #         print('early stop')
-            #         break
-            # else:
-            #     if np.abs(train_diff) < 5e-2:
-            #         print('early stop')
-            #         break
+            if lams[l] > 0:
+                if np.abs(train_diff) < 25e-3 and fish_diff < 0:
+                    print('early stop')
+                    break
+            else:
+                if np.abs(train_diff) < 25e-3:
+                    print('early stop')
+                    break
             #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
             #     #     # print(str(fish_loss.result().numpy()))
             #     #     # print(str(train_loss.result().numpy()))
@@ -228,7 +228,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     return w, c
 
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.00001, align=False, bat=32, cnnlda=False):
     # Train NNs
     w_c = None
     if traincnn is not None or trainmlp is not None:
