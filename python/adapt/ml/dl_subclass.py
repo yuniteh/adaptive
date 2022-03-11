@@ -70,16 +70,21 @@ class CNNenc(Model):
         self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()
 
-    def call(self, x):
+    def call(self, x, training=False, trainable=False):
+        self.bn1.trainable = trainable
+        self.bn2.trainable = trainable
+        self.bn3.trainable = trainable
+        self.bn4.trainable = trainable
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.bn1(x, training=training)
         x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.bn2(x, training=training)
         x = self.flatten(x)
         x = self.dense1(x)
-        x = self.bn3(x)
+        x = self.bn3(x, training=training)
         x = self.latent(x)
-        return self.bn4(x)
+        x = self.bn4(x, training=training)
+        return x
 
 class CNNbase(Model):
     def __init__(self, latent_dim=4, c2=32,name='enc'):
@@ -185,12 +190,12 @@ class CNN(Model):
             self.enc = CNNenc(c1=c1,c2=c2)
         self.clf = CLF(n_class)
     
-    def call(self, x):
+    def call(self, x, training=False, trainable=False):
         if hasattr(self,'top'):
             x = self.top(x)
             x = self.base(x)
         else:
-            x = self.enc(x)
+            x = self.enc(x, training=training, trainable=trainable)
         y = self.clf(x)
         return y
   
@@ -227,12 +232,12 @@ class EWC(Model):
         val_acc(y, y_out)
         return val_acc.result()
     
-    def call(self, x):
+    def call(self, x, training=False, trainable=False):
         if hasattr(self,'top'):
             x = self.top(x)
             x = self.base(x)
         else:
-            x = self.enc(x)
+            x = self.enc(x, training=training, trainable=trainable)
         return self.clf(x)
 
     def compute_fisher(self, imgset, y, num_samples=200, plot_diffs=False, disp_freq=10):
@@ -287,6 +292,7 @@ class EWC(Model):
             # self.int = 0
 
             self.F_old = cp.deepcopy(self.F_accum)
+            self.int = 1
         else:
             # if self.equal:
             #     for v in range(len(self.F_accum)):
@@ -369,7 +375,7 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=False)
+            y_out = mod(x,training=False,trainable=False)
             c_index = tf.argmax(y_out,1)[0]
             if y is None:
                 loss = -tf.math.log(y_out[0,c_index])
@@ -382,7 +388,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0, clda=None):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0, clda=None, trainable=True):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -399,7 +405,7 @@ def get_train():
                         mod.clf.trainable = False
                         y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
-                        y_out = mod(x,training=True)
+                        y_out = mod(x,training=True,trainable=trainable)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
@@ -422,6 +428,7 @@ def get_train():
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+                # print(gradients)
 
         # print(gradients)
 
@@ -441,9 +448,9 @@ def get_test():
     def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
         if align is not None:
             # y_out = mod(align(x))
-            y_out = mod(x)
+            y_out = mod(x,training=False,trainable=False)
         else:
-            y_out = mod(x)
+            y_out = mod(x,training=False,trainable=False)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         if test_loss is not None:

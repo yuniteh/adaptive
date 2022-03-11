@@ -9,7 +9,8 @@ import copy as cp
 
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None):
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
+    # bat = 128
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
@@ -35,7 +36,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -73,7 +74,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             #     lam_in = 1
 
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda)
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda, trainable=False)
                 
                 if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
@@ -158,6 +159,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             # if lams[l] > 0:
             #     if np.abs(train_diff) < 5e-2 and fish_diff < 0:
             #         print('early stop')
+            #         break
+            # else:
+            #     if np.abs(train_diff) < 5e-2:
+            #         print('early stop')
+            #         break
             #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
             #     #     # print(str(fish_loss.result().numpy()))
             #     #     # print(str(train_loss.result().numpy()))
@@ -166,12 +172,16 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
             if lams[l] > 0:
                 print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
-
-        x_train1 = x_train[:x_train.shape[0]//2,...]
-        x_train2 = x_train[x_train.shape[0]//2:,...]
-        x_lda = np.vstack((model.enc(x_train1).numpy(),model.enc(x_train2).numpy()))
-        y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
-        w, c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        
+        if cnnlda:
+            x_train1 = x_train[:x_train.shape[0]//2,...]
+            x_train2 = x_train[x_train.shape[0]//2:,...]
+            x_lda = np.vstack((model.enc(x_train1).numpy(),model.enc(x_train2).numpy()))
+            y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
+            w, c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        else:
+            w = 0
+            c = 0
 
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
@@ -226,6 +236,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         if trainmlp is not None:
             if mlp == None:
                 mlp = MLP(n_class=n_dof)
+                trainable = True
+            else:
+                trainable = False
             if y_train is not None:
                 mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
@@ -234,9 +247,12 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         if traincnn is not None:
             if cnn == None:
                 cnn = CNN(n_class=n_dof)
-            elif not isinstance(cnn,CNN):
-                w_c = cnn[1:3]
-                cnn = cnn[0]
+                trainable = True
+            else:
+                trainable = False
+                if not isinstance(cnn,CNN):
+                    w_c = cnn[1:3]
+                    cnn = cnn[0]
             if y_train is not None:
                 cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
@@ -269,9 +285,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 for x, y, _ in ds:
                     if isinstance(model,CNN):
                         if w_c is not None:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c)
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable)
                         else:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali,trainable=trainable)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
 
@@ -290,7 +306,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         del traincnn 
         x_lda = np.vstack((cnn.enc(x_train1).numpy(),cnn.enc(x_train2).numpy(),cnn.enc(x_train3).numpy(),cnn.enc(x_train4).numpy()))
         y_lda = np.vstack((y_train[:y_train.shape[0]//4,...], y_train[y_train.shape[0]//4:y_train.shape[0]//2,...],y_train[:y_train.shape[0]//2:3*y_train.shape[0]//4,...],y_train[3*y_train.shape[0]//4:,...]))
-        w_c,c_c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        w_c,c_c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
         w_c = w_c.astype('float32')
         c_c = c_c.astype('float32')
     else:

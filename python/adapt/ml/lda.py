@@ -39,7 +39,7 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
             ind = label == u_class[i]
             N[i] = np.sum(np.squeeze(ind))
             mu_class[i,:] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
-            cov_class[i] = np.cov(data[ind[:,0],:].T)
+            cov_class.append(np.cov(data[ind[:,0],:].T))
             C += cov_class[i]
             Sb += ind.shape[0] * np.dot((mu_class[np.newaxis,i,:] - mu).T,(mu_class[np.newaxis,i,:] - mu)) 
 
@@ -75,16 +75,17 @@ def update_lda(data,label,N,mu_class,cov_class):
     n_class = u_class.shape[0]
     ALPHA = np.zeros(N.shape)
     N_new = np.zeros((n_class,))
-
+    C = np.zeros([m,m])
+    
     for i in range(0, n_class):
         ind = np.squeeze(label == u_class[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
         zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
-        mu_class[i,...] = ALPHA * mu_class[i,...] + (1 - ALPHA) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+        mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
         zero_mean_feats_new = data[ind,...] - mu_class[i,...]                                # De-mean based on the updated mean value
         point_cov = np.dot(zero_mean_feats_old.T, zero_mean_feats_new)
-        cov_class[i] = ALPHA * cov_class[i] + (1 - ALPHA) * point_cov                      # Update the covariance
+        cov_class[i] = ALPHA[i] * cov_class[i] + (1 - ALPHA[i]) * point_cov                      # Update the covariance
         C += cov_class[i]
 
         N[i] += N_new[i]
