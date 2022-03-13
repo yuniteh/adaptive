@@ -301,7 +301,6 @@ class EWC(Model):
         
         for v in range(len(self.non_trainable_weights)):
             self.all_vars.append(cp.deepcopy(self.non_trainable_weights[v].numpy()))
-        # self.all_vars = cp.deepcopy(self.get_weights())
 
     def restore(self):
         # reassign optimal weights for latest task
@@ -376,6 +375,10 @@ def get_train():
                 optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
+                if lam > 0:
+                    # [print(grad) for grad in gradients]
+                    # gradients = [(tf.clip_by_value(grad, clip_value_min=-10.0, clip_value_max=10.0)) for grad in gradients]
+                    gradients,_ = tf.clip_by_global_norm(gradients,500)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
                 # print(gradients)
 

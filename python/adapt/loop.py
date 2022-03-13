@@ -23,7 +23,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
     for l in range(len(lams)):
         lam_in = np.abs(lams[l])
-        lam_array = np.arange(lams[l],)
+        if lams[l] > 0:
+            lam_array = np.arange(1,lams[l],lams[l]//5)
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
 
@@ -32,11 +33,12 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -70,8 +72,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             fish_loss.reset_states()
             val_accuracy.reset_states()
 
-            if iter == 0 and lams[l] > 0:
-                lam_in = 1
+            # if iter == 0 and lams[l] > 0:
+            #     lam_in = 1
+            if lams[l] > 0:
+                if iter < 5:
+                    lam_in = lam_array[iter]
+                    lam_in = lams[l]
+                else:
+                    lam_in = lams[l]
 
             for x_in, y_in in ds:
                 train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda, trainable=False)
@@ -84,11 +92,10 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             
             ratio = 0
             ## weight cycling
-            if lams[l] != 0:
-                ratio = (train_loss.result()/fish_loss.result()).numpy()
-                lam_in = lams[l]
-                optimizer.learning_rate = 0.000001
-               
+            # if lams[l] != 0:
+            #     ratio = (train_loss.result()/fish_loss.result()).numpy()
+            #     lam_in = lams[l]
+            #     optimizer.learning_rate = 0.000001
             
             lams_all[int(iter/disp_freq)+1,l] = lam_in
 
@@ -109,14 +116,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 print('early stop')
                 break
             
-            if lams[l] > 0:
-                if np.abs(train_diff) < 25e-3 and fish_diff < 0:
-                    print('early stop')
-                    break
-            else:
-                if np.abs(train_diff) < 25e-3:
-                    print('early stop')
-                    break
+            # if lams[l] > 0:
+            #     if np.abs(train_diff) < 1e-2 and fish_diff < 0:
+            #         print('early stop')
+            #         break
+            # else:
+            #     if np.abs(train_diff) < 25e-3:
+            #         print('early stop')
+            #         break
             #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
             #     #     # print(str(fish_loss.result().numpy()))
             #     #     # print(str(train_loss.result().numpy()))
@@ -181,7 +188,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     return w, c
 
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.00001, align=False, bat=32, cnnlda=False):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
     # Train NNs
     w_c = None
     if traincnn is not None or trainmlp is not None:
