@@ -117,7 +117,7 @@ class CNNtop(Model):
         self.bn1 = BatchNormalization()
 
     def call(self, x, train=False, trainable=False):
-        self.bn2.trainable = trainable
+        self.bn1.trainable = trainable
         x = self.conv1(x)
         x = self.bn1(x, training=train)
         return x

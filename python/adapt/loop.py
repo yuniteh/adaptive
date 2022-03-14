@@ -265,7 +265,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
         test_loss.reset_states()
         test_accuracy.reset_states()
         test_mod = get_test()
-        test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy, align=mlp_align)
+        test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy,)
         acc[1] = test_accuracy.result()*100
     
     # test CNN
@@ -274,7 +274,7 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
             test_loss.reset_states()
             test_accuracy.reset_states()
             test_mod = get_test()
-            test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy, align=cnn_align)
+            test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy)
             acc[2] = test_accuracy.result()*100
         else:
             w = clda[0]
