@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from AdaBound2 import AdaBound as AdaBoundOptimizer
 import copy as cp
+import time
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
@@ -63,6 +64,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         train_last = 9999
         fish_last = 9999
 
+        start_time = time.time()
         # train on current task
         for iter in range(num_iter):
             train_loss.reset_states()
@@ -129,7 +131,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
             if lams[l] > 0:
                 print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
-        
+        print('time: ' + str(time.time()-start_time))
         if cnnlda:
             x_train1 = x_train[:x_train.shape[0]//2,...]
             x_train2 = x_train[x_train.shape[0]//2:,...]
@@ -193,21 +195,21 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             out.extend([w,c])
         else:
             w_c = None
-            if isinstance(model,CNN):
+            if isinstance(model,CNN): # adapting CNN
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 trainable = False
-            elif isinstance(model,MLP):
+            elif isinstance(model,MLP): # adapting MLP
                 ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
                 trainable = False
-            elif model == 'cnn':
+            elif model == 'cnn': # calibrating CNN
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = CNN(n_class=n_dof)
                 trainable = True
-            elif model == 'mlp':
+            elif model == 'mlp': # calibrating MLP
                 ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = MLP(n_class=n_dof)
                 trainable = True
-            elif isinstance(model,list):
+            elif isinstance(model,list): # calibrating CNN-LDA
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 w_c = model[1:3]
                 model = model[0]
@@ -219,6 +221,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             train_mod = get_train()
 
             print('training nn')
+            start_time = time.time()
             for epoch in range(ep):
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
@@ -231,6 +234,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                     if epoch == 0 or epoch == ep-1:
                         print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
             
+            print('time: ' + str(time.time()-start_time))
             out.append(model)
             tf.keras.backend.clear_session()
 
