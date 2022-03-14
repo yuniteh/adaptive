@@ -200,12 +200,15 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
                 trainable = False
             elif model == 'cnn':
+                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = CNN(n_class=n_dof)
                 trainable = True
             elif model == 'mlp':
+                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = MLP(n_class=n_dof)
                 trainable = True
             elif isinstance(model,list):
+                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 w_c = model[1:3]
                 model = model[0]
 
