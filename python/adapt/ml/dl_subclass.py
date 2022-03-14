@@ -144,28 +144,6 @@ class MLP(Model):
         x = self.enc(x)
         return self.clf(x)
 
-## Aligner
-class ALI(Model):
-    def __init__(self, n=32, name='aligner'):
-        super(ALI, self).__init__(name=name)
-        self.dense1 = Dense(128, activation='relu')
-        self.bn1 = BatchNormalization()
-        self.dense2 = Dense(64, activation='relu')
-        self.bn2 = BatchNormalization()
-        self.dense3 = Dense(n, activation='relu')
-
-    def call(self,x):
-        in_shape = x.shape
-        x = tf.reshape(x,(x.shape[0],-1))
-        x = self.dense1(x)
-        x = self.bn1(x)
-        x = self.dense2(x)
-        x = self.bn2(x)
-        x = self.dense3(x)
-        if len(in_shape) > 2:
-            x = tf.reshape(x,in_shape)
-        return x
-
 ## Full models
 class MLPprop(Model):
     def __init__(self, n_class=7, n_prop=1):
@@ -346,7 +324,6 @@ def get_train():
                 if align is not None:
                     if align:
                         y_out = mod.clf(mod.base(mod.top(x,training=True),training=False),training=False)
-                    # y_out = mod(align(x,training=True),training=False)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
@@ -375,9 +352,6 @@ def get_train():
                 if lam > 0:
                     gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
-                # print(gradients)
-
-        # print(gradients)
 
         if train_loss is not None:
             train_loss(loss)
@@ -394,7 +368,6 @@ def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
         if align is not None:
-            # y_out = mod(align(x))
             y_out = mod(x,training=False,train=False,trainable=False)
         else:
             y_out = mod(x,training=False,train=False,trainable=False)
