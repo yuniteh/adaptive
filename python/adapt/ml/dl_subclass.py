@@ -378,7 +378,7 @@ def get_train():
                 if lam > 0:
                     # [print(grad) for grad in gradients]
                     # gradients = [(tf.clip_by_value(grad, clip_value_min=-10.0, clip_value_max=10.0)) for grad in gradients]
-                    gradients,_ = tf.clip_by_global_norm(gradients,500)
+                    gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
                 # print(gradients)
 

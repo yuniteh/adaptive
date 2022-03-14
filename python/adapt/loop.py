@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from AdaBound2 import AdaBound as AdaBoundOptimizer
 import copy as cp
-
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
     # bat = 128
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
@@ -189,6 +190,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
     # Train NNs
     w_c = None
     if traincnn is not None or trainmlp is not None:
@@ -286,6 +289,8 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         return mlp, cnn, w, c, w_c, c_c
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')

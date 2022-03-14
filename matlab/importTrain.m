@@ -151,6 +151,16 @@ for subs = 1:iter
             if strcmp(deblank(DAQ_subfolder_filenames(1,:)),'..')==1
                 DAQ_subfolder_filenames(1,:) = [];
             end
+            temp = DAQ_subfolder_filenames;
+            temp_i = 1;
+            for check_i=1:size(DAQ_subfolder_filenames,1)
+                if strcmp(deblank(DAQ_subfolder_filenames(check_i,end-3:end)),'.DAQ')~=1
+                    temp(temp_i,:) = [];
+                else
+                    temp_i = temp_i+1;
+                end
+            end
+            DAQ_subfolder_filenames = temp;
             numfiles = size(DAQ_subfolder_filenames,1);
             
             MAT_subfolder_path = [MATpath '\' deblank(DAQfilenames(iDAQFile,:))]; %Create path to MAT subfolder using same name as DAQ subfolder
@@ -212,7 +222,12 @@ for subs = 1:iter
                     matfile = fullfile(MAT_subfolder_path, [file '.mat']);
                     save(matfile, file);
                     
-                    data_all{i_DAQSubfolderFile} = daq.DAQ_DATA(end-2999:end,:);
+                    if size(daq.DAQ_DATA,1) >= 3000
+                        data_all{i_DAQSubfolderFile} = daq.DAQ_DATA(end-2999:end,:);
+                    else
+                        disp('not full')
+                        data_all{i_DAQSubfolderFile} = daq.DAQ_DATA;
+                    end
                     params(i_DAQSubfolderFile,1) = find(cl_list==cl);
                     params(i_DAQSubfolderFile,2) = cl_count(cl_list == cl);
                     params(i_DAQSubfolderFile,3) = cl;
