@@ -9,8 +9,6 @@ import copy as cp
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
-    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
-    tf.keras.mixed_precision.experimental.set_policy(policy)
     # bat = 128
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
@@ -186,10 +184,62 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c
 
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, print_b=False, lr=0.0001, bat=32):
+    # Train NNs
+    out = []
+    for model in mod:
+        if model == 'lda':
+            w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
+            out.extend([w,c])
+        else:
+            w_c = None
+            if isinstance(model,CNN):
+                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
+                trainable = False
+            elif isinstance(model,MLP):
+                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
+                trainable = False
+            elif model == 'cnn':
+                model = CNN(n_class=n_dof)
+                trainable = True
+            elif model == 'mlp':
+                model = MLP(n_class=n_dof)
+                trainable = True
+            elif isinstance(model,list):
+                w_c = model[1:3]
+                model = model[0]
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
-    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
-    tf.keras.mixed_precision.experimental.set_policy(policy)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            train_loss = tf.keras.metrics.Mean(name='train_loss')
+            train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+            
+            train_mod = get_train()
+
+            print('training nn')
+            for epoch in range(ep):
+                # Reset the metrics at the start of the next epoch
+                train_loss.reset_states()
+                train_accuracy.reset_states()
+
+                for x, y, _ in ds:
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable)
+
+                if print_b:
+                    if epoch == 0 or epoch == ep-1:
+                        print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+            
+            out.append(model)
+            tf.keras.backend.clear_session()
+
+            if cnnlda and isinstance(model,CNN):
+                w_c,c_c, _, _, _, _, _ = train_lda(model.enc(traincnn),np.argmax(y_train,axis=1)[...,np.newaxis])
+                w_c = w_c.astype('float32')
+                c_c = c_c.astype('float32')
+                out.extend([w_c,c_c])
+    return out
+
+
+def train_models_old(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
     # Train NNs
     w_c = None
     if traincnn is not None or trainmlp is not None:
@@ -259,7 +309,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             tf.keras.backend.clear_session()
 
     if cnnlda:
-        print(traincnn.shape)
         x_train1 = traincnn[:traincnn.shape[0]//4,...]
         x_train2 = traincnn[traincnn.shape[0]//4:traincnn.shape[0]//2,...]
         x_train3 = traincnn[:traincnn.shape[0]//2:3*traincnn.shape[0]//4,...]
@@ -267,7 +316,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         del traincnn 
         x_lda = np.vstack((cnn.enc(x_train1).numpy(),cnn.enc(x_train2).numpy(),cnn.enc(x_train3).numpy(),cnn.enc(x_train4).numpy()))
         y_lda = np.vstack((y_train[:y_train.shape[0]//4,...], y_train[y_train.shape[0]//4:y_train.shape[0]//2,...],y_train[:y_train.shape[0]//2:3*y_train.shape[0]//4,...],y_train[3*y_train.shape[0]//4:,...]))
-        w_c,c_c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        w_c,c_c, _, _, _, _, _ = train_lda(cnn.enc(traincnn),np.argmax(y_train,axis=1)[...,np.newaxis])
         w_c = w_c.astype('float32')
         c_c = c_c.astype('float32')
     else:
@@ -287,8 +336,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         return mlp, cnn, w, c, w_c, c_c
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
-    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
-    tf.keras.mixed_precision.experimental.set_policy(policy)
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
