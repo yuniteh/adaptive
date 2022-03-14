@@ -68,12 +68,7 @@ def truncate(data):
     return data
 
 def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=128,noise=True, scaler=None, emg_scale=None, ft='feat', split=False):
-    # x_train, params = threshold(x_train,params)
-    # print(np.unique(params[:,-1]))
     if split:
-        # for cl in np.unique(params[:,-1]):
-        #     num = np.max(params[params[:,-1] == cl,1])
-        #     if num 
         x_rest = x_train[params[:,-1] == 1,...]
         x_train_half = x_train[(params[:,1]%2==0) & (params[:,-1] != 1),...]
         x_train = np.vstack((x_rest[:x_rest.shape[0]//2,...],x_train_half))
@@ -82,7 +77,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         p_train_half = params[(params[:,1]%2==0) & (params[:,-1] != 1),...]
         params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_train_half))
 
-    # print(np.unique(params[:,-1]))
     x_train, params = shuffle(x_train, params, random_state = 0)
     x_orig = cp.deepcopy(x_train)
     
@@ -145,9 +139,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
 def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='feat', split=False):
-    # x = x[params[:,-1]!=1,...]
-    # params = params[params[:,-1]!=1,...]
-    # x, params = threshold(x,params)
     if split:
         x_rest = x[params[:,2] == 1,...]
         x_test_half = x[(params[:,1]%2!=0) & (params[:,2] !=1),...]
