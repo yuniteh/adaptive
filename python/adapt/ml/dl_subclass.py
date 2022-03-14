@@ -310,7 +310,6 @@ class EWC(Model):
             
             for v in range(len(self.non_trainable_weights)):
                 self.non_trainable_weights[v].assign(self.all_vars[v])
-            # self.set_weights(self.all_vars)
 
 def eval_nn(x, y, mod, clean):
     y_pred = np.argmax(mod(x).numpy(),axis=1)
@@ -358,8 +357,6 @@ def get_train():
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
-                    # for v in range(len(mod.F_accum)):
-                    #     mod.F_accum[v] = mod.F_accum[v]/(0.001*lam*mod.F_accum[v] + 1)
                     for v in range(len(mod.trainable_weights)):
                         f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                         f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
@@ -376,8 +373,6 @@ def get_train():
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
                 if lam > 0:
-                    # [print(grad) for grad in gradients]
-                    # gradients = [(tf.clip_by_value(grad, clip_value_min=-10.0, clip_value_max=10.0)) for grad in gradients]
                     gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
                 # print(gradients)

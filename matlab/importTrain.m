@@ -234,13 +234,13 @@ for subs = 1:iter
                 end
             end
             
-            data_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),size(data_all{1},2),win);
+            data_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),8,win);
             params_out = NaN((1+((size(data_all{1},1)-win)/inc))*length(data_all),3);
             
             trial_i = 1;
             for trial=1:length(data_all)
                 for win_i = 1:inc:size(data_all{trial},1)-win+1
-                    data_out(trial_i,:,:) = data_all{trial}(win_i:win_i+win-1,:)';
+                    data_out(trial_i,:,:) = data_all{trial}(win_i:win_i+win-1,1:8)';
                     params_out(trial_i,:) = params(trial,:);
                     trial_i = trial_i + 1;
                 end
