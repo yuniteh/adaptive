@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, ALI, get_train, get_test, EWC, CNNenc
+from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test, EWC, CNNenc
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -247,103 +247,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                     w_c, c_c = 0, 0
                 out.extend([w_c,c_c])
     return out
-
-
-def train_models_old(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
-    # Train NNs
-    w_c = None
-    if traincnn is not None or trainmlp is not None:
-        models = []
-        if trainmlp is not None:
-            if mlp == None:
-                mlp = MLP(n_class=n_dof)
-                trainable = True
-            else:
-                trainable = False
-            if y_train is not None:
-                mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
-            else:
-                mlp_ds = trainmlp
-            models.append(mlp)
-        if traincnn is not None:
-            if cnn == None:
-                cnn = CNN(n_class=n_dof)
-                trainable = True
-            else:
-                trainable = False
-                if not isinstance(cnn,CNN):
-                    w_c = cnn[1:3]
-                    cnn = cnn[0]
-            if y_train is not None:
-                cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
-            else:
-                cnn_ds = traincnn
-            models.append(cnn)
-        if align == True:
-            mlp_ali = ALI()
-            cnn_ali = ALI()
-        else:
-            mlp_ali = None
-            cnn_ali = None
-
-        optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
-        train_loss = tf.keras.metrics.Mean(name='train_loss')
-        train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-        for model in models:
-            if isinstance(model,CNN):
-                ds = cnn_ds
-            else:
-                ds = mlp_ds
-            
-            train_mod = get_train()
-
-            print('training nn')
-            for epoch in range(ep):
-                # Reset the metrics at the start of the next epoch
-                train_loss.reset_states()
-                train_accuracy.reset_states()
-
-                for x, y, _ in ds:
-                    if isinstance(model,CNN):
-                        if w_c is not None:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable)
-                        else:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali,trainable=trainable)
-                    else:
-                        train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
-
-                if print_b:
-                    if epoch == 0 or epoch == ep-1:
-                        print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
-            
-            tf.keras.backend.clear_session()
-
-    if cnnlda:
-        x_train1 = traincnn[:traincnn.shape[0]//4,...]
-        x_train2 = traincnn[traincnn.shape[0]//4:traincnn.shape[0]//2,...]
-        x_train3 = traincnn[:traincnn.shape[0]//2:3*traincnn.shape[0]//4,...]
-        x_train4 = traincnn[3*traincnn.shape[0]//4:,...]
-        del traincnn 
-        x_lda = np.vstack((cnn.enc(x_train1).numpy(),cnn.enc(x_train2).numpy(),cnn.enc(x_train3).numpy(),cnn.enc(x_train4).numpy()))
-        y_lda = np.vstack((y_train[:y_train.shape[0]//4,...], y_train[y_train.shape[0]//4:y_train.shape[0]//2,...],y_train[:y_train.shape[0]//2:3*y_train.shape[0]//4,...],y_train[3*y_train.shape[0]//4:,...]))
-        w_c,c_c, _, _, _, _, _ = train_lda(cnn.enc(traincnn),np.argmax(y_train,axis=1)[...,np.newaxis])
-        w_c = w_c.astype('float32')
-        c_c = c_c.astype('float32')
-    else:
-        w_c=0
-        c_c=0
-
-    # Train LDA
-    if x_train_lda is not None:
-        w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
-    else:
-        w=0
-        c=0
-
-    if align:
-        return mlp, cnn, mlp_ali, cnn_ali, w, c
-    else:
-        return mlp, cnn, w, c, w_c, c_c
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
     acc = np.empty((5,))
