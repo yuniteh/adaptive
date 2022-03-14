@@ -36,11 +36,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         if lams[l] == 0:
             # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
-            # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
             # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
-            # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
         train_ewc = get_train()
