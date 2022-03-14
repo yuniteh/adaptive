@@ -231,10 +231,13 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             out.append(model)
             tf.keras.backend.clear_session()
 
-            if cnnlda and isinstance(model,CNN):
-                w_c,c_c, _, _, _, _, _ = train_lda(model.enc(traincnn),np.argmax(y_train,axis=1)[...,np.newaxis])
-                w_c = w_c.astype('float32')
-                c_c = c_c.astype('float32')
+            if isinstance(model,CNN):
+                if cnnlda:
+                    w_c,c_c, _, _, _, _, _ = train_lda(model.enc(traincnn),np.argmax(y_train,axis=1)[...,np.newaxis])
+                    w_c = w_c.astype('float32')
+                    c_c = c_c.astype('float32')
+                else:
+                    w_c, c_c = 0, 0
                 out.extend([w_c,c_c])
     return out
 
