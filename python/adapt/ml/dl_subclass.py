@@ -97,14 +97,18 @@ class CNNbase(Model):
         self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()
 
-    def call(self, x):
+    def call(self, x, train=False, trainable=False):
+        self.bn2.trainable = trainable
+        self.bn3.trainable = trainable
+        self.bn4.trainable = trainable
         x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.bn2(x, training=train)
         x = self.flatten(x)
         x = self.dense1(x)
-        x = self.bn3(x)
+        x = self.bn3(x, training=train)
         x = self.latent(x)
-        return self.bn4(x)
+        x = self.bn4(x, training=train)
+        return x
 
 class CNNtop(Model):
     def __init__(self, c1=32, c2=32,name='enc'):
@@ -112,9 +116,10 @@ class CNNtop(Model):
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same")
         self.bn1 = BatchNormalization()
 
-    def call(self, x):
+    def call(self, x, train=False, trainable=False):
+        self.bn2.trainable = trainable
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.bn1(x, training=train)
         return x
 
 ## Classifier
@@ -170,8 +175,8 @@ class CNN(Model):
     
     def call(self, x, train=False, trainable=False):
         if hasattr(self,'top'):
-            x = self.top(x)
-            x = self.base(x)
+            x = self.top(x, train=train, trainable=trainable)
+            x = self.base(x, train=train, trainable=trainable)
         else:
             x = self.enc(x, train=train, trainable=trainable)
         y = self.clf(x)
@@ -268,7 +273,6 @@ class EWC(Model):
                 self.F_accum[vi] = self.F_accum[vi] + self.F_old[vi]
             self.F_old = cp.deepcopy(self.F_accum)
 
-
     def star(self):
         # used for saving optimal weights after most recent task training
         self.star_vars = []
@@ -313,7 +317,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, align=None, prop=False, lam=0, clda=None, trainable=True):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -321,9 +325,8 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             else:
-                if align is not None:
-                    if align:
-                        y_out = mod.clf(mod.base(mod.top(x,training=True),training=False),training=False)
+                if adapt:
+                    y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
@@ -339,10 +342,9 @@ def get_train():
                         f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                         loss += f_loss             
         
-        if align is not None:
-            if align:
-                gradients = tape.gradient(loss, mod.top.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, mod.top.trainable_variables))
+        if adapt:
+            gradients = tape.gradient(loss, mod.top.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, mod.top.trainable_variables))
         else:
             if clda is not None:
                 gradients = tape.gradient(loss, mod.enc.trainable_variables)
@@ -366,11 +368,8 @@ def get_train():
 
 def get_test():
     @tf.function
-    def test_step(x, y, mod, test_loss=None, test_accuracy=None,align=None):
-        if align is not None:
-            y_out = mod(x,training=False,train=False,trainable=False)
-        else:
-            y_out = mod(x,training=False,train=False,trainable=False)
+    def test_step(x, y, mod, test_loss=None, test_accuracy=None):
+        y_out = mod(x,training=False,train=False,trainable=False)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         if test_loss is not None:
