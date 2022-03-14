@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from AdaBound2 import AdaBound as AdaBoundOptimizer
 import copy as cp
-
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None):
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
+    # bat = 128
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
@@ -22,7 +24,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
     for l in range(len(lams)):
         lam_in = np.abs(lams[l])
-        lam_array = np.arange(lams[l],)
+        if lams[l] > 0:
+            lam_array = np.arange(1,lams[l],lams[l]//5)
         # lams[l] sets weight on old task(s)
         model.restore() # reassign optimal weights from previous training session
 
@@ -31,11 +34,12 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
         else:
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.00005,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
             # optimizer = AdaBoundOptimizer(learning_rate=0.0001, final_lr=0.001)
         
         # train functions
@@ -69,70 +73,30 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             fish_loss.reset_states()
             val_accuracy.reset_states()
 
-            if iter == 0:
-                lam_in = 0
+            # if iter == 0 and lams[l] > 0:
+            #     lam_in = 1
+            if lams[l] > 0:
+                if iter < 5:
+                    lam_in = lam_array[iter]
+                    lam_in = lams[l]
+                else:
+                    lam_in = lams[l]
 
             for x_in, y_in in ds:
-                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda)
+                train_ewc(x_in, y_in, model, optimizer, train_loss, fish_loss, lam=lam_in, clda=clda, trainable=False)
                 
                 if f_loss[0,l] == 0:
                     loss[0,l] = train_loss.result()
                     f_loss[0,l] = fish_loss.result()
+                    if lams[l] > 0:
+                        print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in))
             
             ratio = 0
             ## weight cycling
-            if lams[l] != 0:
-                ratio = (train_loss.result()/fish_loss.result()).numpy()
-                if iter < 5:
-                    if ratio < 100:
-                        lam_in = ratio
-                    else:                      
-                        lam_in = 100
-                    optimizer.learning_rate = 0.000001
-                # #     optimizer.learning_rate = 0.0001
-                # # #     # lam_in = lams[l]
-                # # else:
-                #     # if train_loss.result().numpy() < 1:
-                #     #     if ratio > 50:
-                #     #         lam_in = 50
-                #     #     else:
-                #     #         lam_in = ratio
-                else:
-                    lam_in = lams[l]
-                    optimizer.learning_rate = 0.000001
-                # lam_in = train_loss.result().numpy()/fish_loss.result().numpy()
-                # print(lam_in)
-                # optimizer.learning_rate = 0.0001
-                
-                # if train_loss.result().numpy() > 1 and iter < 10:
-                #     lam_in = 0
-                #     optimizer.learning_rate = 0.0001
-                # elif train_loss.result().numpy() < 0.5:
-                #     lam_in = lams[l]*2
-                # else:
-                #     lam_in = lams[l]
-                # if train_loss.result().numpy() < 1:# or (iter < 30 and iter > 20) or (iter < 50 and iter > 40):
-                #     # lam_in = lams[l]
-                #     ratio = (train_loss.result()/fish_loss.result()).numpy()
-                #     optimizer.learning_rate = 0.00001
-                #     if fish_loss.result().numpy() > 1e-5:
-                #         if train_loss.result().numpy() > 0.7:
-                #             lam_in = ratio/10
-                #         elif train_loss.result().numpy() > 0.5:
-                #             lam_in = ratio/5
-                #         elif ratio > 50000:
-                #             lam_in = 50000/2
-                #             optimizer.learning_rate = 0.000001
-                #         else:
-                #             lam_in = ratio/2
-                #     else:
-                #         lam_in = lams[l]
-                # else:
-                #     lam_in = 0
-                #     optimizer.learning_rate = 0.001
-
-            # if lams[l] < 0 and f_loss[iter,l] != 0:
-            #     lam_in = np.float32(loss[iter,l]/f_loss[iter,l])
+            # if lams[l] != 0:
+            #     ratio = (train_loss.result()/fish_loss.result()).numpy()
+            #     lam_in = lams[l]
+            #     optimizer.learning_rate = 0.000001
             
             lams_all[int(iter/disp_freq)+1,l] = lam_in
 
@@ -153,21 +117,32 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 print('early stop')
                 break
             
-            if lams[l] > 0:
-                if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
-                    # print(str(fish_loss.result().numpy()))
-                    # print(str(train_loss.result().numpy()))
-                    print('early stop fish')
-                    break
-
             # if lams[l] > 0:
-            #     print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
+            #     if np.abs(train_diff) < 1e-2 and fish_diff < 0:
+            #         print('early stop')
+            #         break
+            # else:
+            #     if np.abs(train_diff) < 25e-3:
+            #         print('early stop')
+            #         break
+            #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
+            #     #     # print(str(fish_loss.result().numpy()))
+            #     #     # print(str(train_loss.result().numpy()))
+            #     #     print('early stop fish')
+            #         break
 
-        x_train1 = x_train[:x_train.shape[0]//2,...]
-        x_train2 = x_train[x_train.shape[0]//2:,...]
-        x_lda = np.vstack((model.enc(x_train1).numpy(),model.enc(x_train2).numpy()))
-        y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
-        w, c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+            if lams[l] > 0:
+                print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
+        
+        if cnnlda:
+            x_train1 = x_train[:x_train.shape[0]//2,...]
+            x_train2 = x_train[x_train.shape[0]//2:,...]
+            x_lda = np.vstack((model.enc(x_train1).numpy(),model.enc(x_train2).numpy()))
+            y_lda = np.vstack((y_train[:x_train.shape[0]//2,...], y_train[x_train.shape[0]//2:,...]))
+            w, c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        else:
+            w = 0
+            c = 0
 
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
@@ -215,6 +190,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mlp=None, cnn=None, print_b=False, lr=0.0001, align=False, bat=32, cnnlda=False):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
     # Train NNs
     w_c = None
     if traincnn is not None or trainmlp is not None:
@@ -222,6 +199,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         if trainmlp is not None:
             if mlp == None:
                 mlp = MLP(n_class=n_dof)
+                trainable = True
+            else:
+                trainable = False
             if y_train is not None:
                 mlp_ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
@@ -230,10 +210,12 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         if traincnn is not None:
             if cnn == None:
                 cnn = CNN(n_class=n_dof)
-            
-            elif not isinstance(cnn,CNN):
-                w_c = cnn[1:3]
-                cnn = cnn[0]
+                trainable = True
+            else:
+                trainable = False
+                if not isinstance(cnn,CNN):
+                    w_c = cnn[1:3]
+                    cnn = cnn[0]
             if y_train is not None:
                 cnn_ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             else:
@@ -247,8 +229,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             cnn_ali = None
 
         optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
-        # optimizer = AdaBoundOptimizer(learning_rate=0.001, final_lr=0.01)
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         for model in models:
@@ -268,9 +248,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 for x, y, _ in ds:
                     if isinstance(model,CNN):
                         if w_c is not None:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c)
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable)
                         else:
-                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali)
+                            train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=cnn_ali,trainable=trainable)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy, align=mlp_ali)
 
@@ -289,9 +269,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
         del traincnn 
         x_lda = np.vstack((cnn.enc(x_train1).numpy(),cnn.enc(x_train2).numpy(),cnn.enc(x_train3).numpy(),cnn.enc(x_train4).numpy()))
         y_lda = np.vstack((y_train[:y_train.shape[0]//4,...], y_train[y_train.shape[0]//4:y_train.shape[0]//2,...],y_train[:y_train.shape[0]//2:3*y_train.shape[0]//4,...],y_train[3*y_train.shape[0]//4:,...]))
-        # x_lda = cnn.enc(traincnn).numpy()
-        # y_lda = y_train
-        w_c,c_c, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
+        w_c,c_c, _, _, _, _, _ = train_lda(x_lda,np.argmax(y_lda,axis=1)[...,np.newaxis])
         w_c = w_c.astype('float32')
         c_c = c_c.astype('float32')
     else:
@@ -300,18 +278,19 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
 
     # Train LDA
     if x_train_lda is not None:
-        w,c, _, _, _ = train_lda(x_train_lda,y_train_lda)
+        w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
     else:
         w=0
         c=0
 
-    # print(align)
     if align:
         return mlp, cnn, mlp_ali, cnn_ali, w, c
     else:
         return mlp, cnn, w, c, w_c, c_c
 
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy)
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
