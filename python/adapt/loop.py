@@ -55,7 +55,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
             test_accs[task][0] = val_accuracy.result()
 
-            if task != len(x_test)-1:
+            if task < len(x_test)-1:
                 end_p = ', '
             else:
                 end_p = '\n'
@@ -144,7 +144,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
         print(f'Final', end=' '),
         for task in range(len(x_test)):       
-            if task != len(x_test)-1:
+            if task < len(x_test)-1:
                 end_p = ', '
             else:
                 end_p = '\n'
