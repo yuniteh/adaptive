@@ -97,12 +97,13 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     x_train_clean, y_train_clean = shuffle(x_train,y,random_state=0)
 
     if noise:
-        x_train_noise, x_train_clean, y_train_noise = add_noise_caps(x_train, params, num_classes=num_classes)
+        x_train_noise, _, y_train_noise = add_noise_caps(x_train, params, num_classes=num_classes)
             
         # shuffle data to make even batches
-        x_train_noise, x_train_clean, y_train_noise = shuffle(x_train_noise, x_train_clean, y_train_noise, random_state = 0)
+        x_train_noise, y_train_noise = shuffle(x_train_noise, y_train_noise, random_state = 0)
     else:
         x_train_noise = cp.deepcopy(x_train_clean)
+        y_train_noise = cp.deepcopy(y_train_clean)
 
     # calculate class MAV
     if prop_b:
@@ -131,11 +132,11 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     x_train_noise_mlp = x_train_noise_cnn.reshape(x_train_noise_cnn.shape[0],-1)
 
     # clean data
-    x_train_clean_cnn, _, _, _= extract_scale(x_train_noise,scaler=scaler,load=load,ft=ft,caps=True) 
+    x_train_clean_cnn, _, _, _= extract_scale(x_train_clean,scaler=scaler,load=True,ft=ft,caps=True) 
     x_train_clean_cnn = x_train_clean_cnn.astype('float32')        
 
     # reshape data for nonconvolutional network
-    x_train_clean_mlp = x_train_clean_cnn.reshape(x_train_noise_cnn.shape[0],-1)
+    x_train_clean_mlp = x_train_clean_cnn.reshape(x_train_clean_cnn.shape[0],-1)
 
     # LDA data
     y_train_lda = params[:,[0]] - 1
