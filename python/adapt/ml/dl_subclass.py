@@ -328,7 +328,7 @@ def get_train():
                 z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
-                loss = class_loss + kl_loss*lam/100
+                loss = class_loss + kl_loss*lam/10
                 if hasattr(mod,'dec'):
                     rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
                     loss += rec_loss*lam
