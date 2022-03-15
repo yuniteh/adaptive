@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras.layers import Lambda, Dense, Flatten, Conv2D, BatchNormalization
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization, Conv2DTranspose, Reshape
 from tensorflow.keras import Model
 import numpy as np
 import copy as cp
@@ -38,12 +38,43 @@ class VAR(Model):
 
     def sampling(self, z_mean, z_log_var):
         #Reparameterization trick by sampling from an isotropic unit Gaussian.
-        # z_mean, z_log_var = args
         batch = K.shape(z_mean)[0]
         dim = K.int_shape(z_mean)[1]
         # by default, random_normal has mean = 0 and std = 1.0
         epsilon = K.random_normal(shape=(batch, dim), dtype=z_mean.dtype)
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
+    
+    def get_shapes(self, x):
+        x = self.conv1(x)
+        conv1_s = x.shape()
+        x = self.conv2(x)
+        conv2_s = x.shape()
+        x = self.flatten(x)
+        flat_s = x.shape()
+        return conv1_s, conv2_s, flat_s
+
+class DEC(Model):
+    def __init__(self, flat_s, conv2_s, name='dec'):
+        super(DEC,self).__init__(name=name)
+        self.den1 = Dense(16, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn1 = BatchNormalization()
+        self.den2 = Dense(flat_s[0], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn2 = BatchNormalization()
+        self.conv2s = conv2_s
+        self.tconv = Conv2DTranspose(32, 3, activation='relu', padding='same')
+        self.bn3 = BatchNormalization()
+        self.tconv2 = Conv2DTranspose(1, 3, activation='relu', padding='same')
+
+    def call(self, x):
+        x = self.den1(x)
+        x = self.bn1(x)
+        x = self.den2(x)
+        x = self.bn2(x)
+        x = tf.reshape(x,self.conv2s)
+        x = self.tconv(x)
+        x = self.bn3(x)
+        x = self.tconv2(x)
+        return x
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
