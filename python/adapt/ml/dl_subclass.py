@@ -46,10 +46,13 @@ class VAR(Model):
     
     def get_shapes(self, x):
         x = self.conv1(x)
+        print(tf.shape(x))
         x = self.conv2(x)
-        conv2_s = x.shape()
+        print(tf.shape(x))
+        conv2_s = tf.shape(x)
         x = self.flatten(x)
-        flat_s = x.shape()
+        flat_s = tf.shape(x)
+        print(tf.shape(x))
         return flat_s, conv2_s
 
 class DEC(Model):
@@ -57,9 +60,9 @@ class DEC(Model):
         super(DEC,self).__init__(name=name)
         self.den1 = Dense(16, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
-        self.den2 = Dense(flat_s[0], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.den2 = Dense(flat_s[1], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
-        self.conv2s = conv2_s
+        self.rshape = Reshape(conv2_s[1:])
         self.tconv = Conv2DTranspose(32, 3, activation='relu', padding='same')
         self.bn3 = BatchNormalization()
         self.tconv2 = Conv2DTranspose(1, 3, activation='relu', padding='same')
@@ -67,12 +70,17 @@ class DEC(Model):
     def call(self, x):
         x = self.den1(x)
         x = self.bn1(x)
+        print('hi')
+        print(tf.shape(x))
         x = self.den2(x)
         x = self.bn2(x)
-        x = tf.reshape(x,self.conv2s)
+        print(tf.shape(x))
+        # x = tf.reshape(x,self.conv2s)
+        x = self.rshape(x)
         x = self.tconv(x)
         x = self.bn3(x)
         x = self.tconv2(x)
+        print(tf.shape(x))
         return x
 
 class CNNenc(Model):
@@ -314,13 +322,12 @@ def get_train():
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
                 x_out, y_out = mod(x,training=True)
-                y_out = mod(x,training=True)
                 z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                 loss = class_loss + kl_loss
                 if hasattr(mod,'dec'):
-                    rec_loss = tf.keras.losses.mean_squared_error(x, x_out)
+                    rec_loss = tf.reduce_sum(tf.keras.losses.mean_squared_error(x, x_out))/10
                     loss += rec_loss
             else:
                 if adapt:

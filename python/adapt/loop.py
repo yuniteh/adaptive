@@ -205,6 +205,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 trainable = True
             elif model == 'vcnn':
                 model = VCNN(n_class=n_dof)
+                model(traincnn[:1,...])
+                model.add_dec(traincnn[:1,...])
+                model(traincnn[:1,...])
                 trainable = True
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
