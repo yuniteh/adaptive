@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization, Conv2DTranspose, Reshape
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization, Conv2DTranspose, Reshape, Concatenate
 from tensorflow.keras import Model
 import numpy as np
 import copy as cp
@@ -55,6 +55,7 @@ class VAR(Model):
 class DEC(Model):
     def __init__(self, flat_s, conv2_s, name='dec'):
         super(DEC,self).__init__(name=name)
+        self.cat = Concatenate()
         self.den1 = Dense(16, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
         self.den2 = Dense(flat_s[1], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
@@ -64,7 +65,9 @@ class DEC(Model):
         self.bn3 = BatchNormalization()
         self.tconv2 = Conv2DTranspose(1, 3, activation='relu', padding='same')
 
-    def call(self, x):
+    def call(self, x, cls):
+        x2 = tf.tile(cls[...,tf.newaxis],[1,x.shape[1]])
+        x = self.cat([x,x2])
         x = self.den1(x)
         x = self.bn1(x)
         x = self.den2(x)
@@ -159,13 +162,13 @@ class VCNN(Model):
         flat_s, conv2_s = self.var.get_shapes(x)
         self.dec = DEC(flat_s, conv2_s)
     
-    def call(self, x, train=False, bn_trainable=False):
+    def call(self, x, y=None, train=False, bn_trainable=False):
         x_out = 0
         z_mean, z_log_var, z = self.var(x)
-        y = self.clf(z_mean)
-        if hasattr(self,'dec'):
-            x_out = self.dec(z) 
-        return x_out, y
+        y_out = self.clf(z_mean)
+        if hasattr(self,'dec') and y is not None:
+            x_out = self.dec(z, y)
+        return x_out, y_out
 
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
@@ -313,7 +316,7 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
-                x_out, y_out = mod(x,training=True)
+                x_out, y_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32))
                 z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
