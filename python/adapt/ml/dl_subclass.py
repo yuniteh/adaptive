@@ -46,12 +46,11 @@ class VAR(Model):
     
     def get_shapes(self, x):
         x = self.conv1(x)
-        conv1_s = x.shape()
         x = self.conv2(x)
         conv2_s = x.shape()
         x = self.flatten(x)
         flat_s = x.shape()
-        return conv1_s, conv2_s, flat_s
+        return flat_s, conv2_s
 
 class DEC(Model):
     def __init__(self, flat_s, conv2_s, name='dec'):
@@ -156,10 +155,17 @@ class VCNN(Model):
         self.var = VAR(c1=c1,c2=c2)
         self.clf = CLF(n_class)
     
+    def add_dec(self, x):
+        flat_s, conv2_s = self.var.get_shapes(x)
+        self.dec = DEC(flat_s, conv2_s)
+    
     def call(self, x, train=False, bn_trainable=False):
+        x_out = 0
         z_mean, z_log_var, z = self.var(x)
         y = self.clf(z_mean)
-        return y
+        if hasattr(self,'dec'):
+            x_out = self.dec(z) 
+        return x_out, y
 
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
@@ -307,11 +313,15 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
+                x_out, y_out = mod(x,training=True)
                 y_out = mod(x,training=True)
                 z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                 loss = class_loss + kl_loss
+                if hasattr(mod,'dec'):
+                    rec_loss = tf.keras.losses.mean_squared_error(x, x_out)
+                    loss += rec_loss
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
@@ -361,7 +371,10 @@ def get_train():
 def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None):
-        y_out = mod(x,training=False,train=False,bn_trainable=False)
+        if hasattr(mod, 'dec'):
+            x_out, y_out = mod(x,training=False,train=False,bn_trainable=False)
+        else:
+            y_out = mod(x,training=False,train=False,bn_trainable=False)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
         if test_loss is not None:
