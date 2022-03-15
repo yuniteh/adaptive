@@ -7,56 +7,6 @@ import matplotlib.pyplot as plt
 from IPython import display
 from collections import deque
 
-## Encoders
-class MLPenc(Model):
-    def __init__(self, latent_dim=4, name='enc'):
-        super(MLPenc, self).__init__(name=name)
-        self.dense1 = Dense(246, activation='relu')
-        self.bn1 = BatchNormalization()
-        self.dense2 = Dense(128, activation='relu')
-        self.bn2 = BatchNormalization()
-        self.dense3 = Dense(16, activation='relu')
-        self.bn3 = BatchNormalization()
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()
-
-    def call(self, x):
-        x = self.dense1(x)
-        x = self.bn1(x)
-        x = self.dense2(x)
-        x = self.bn2(x)
-        x = self.dense3(x)
-        x = self.bn3(x)
-        x = self.latent(x)
-        return self.bn4(x)
-
-class EWCenc(Model):
-    def __init__(self, latent_dim=4, name='enc'):
-        super(EWCenc, self).__init__(name=name)
-        self.dense1 = Dense(246, activation='relu')
-        self.bn1 = BatchNormalization()
-        self.dense2 = Dense(128, activation='relu')
-        self.bn2 = BatchNormalization()
-        self.dense3 = Dense(16, activation='relu')
-        # self.dense4 = Dense(128, activation='relu')
-        # self.dense5 = Dense(128, activation='relu')
-        self.bn3 = BatchNormalization()
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()
-
-    def call(self, x):
-        x = self.dense1(x)
-        x = self.bn1(x)
-        x = self.dense2(x)
-        x = self.bn2(x)
-        x = self.dense3(x)
-        x = self.bn3(x)
-        # x = self.dense4(x)
-        # x = self.dense5(x)
-        x = self.latent(x)
-        x = self.bn4(x)
-        return x
-
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
@@ -131,38 +81,6 @@ class CLF(Model):
     def call(self, x):
         return self.dense1(x)
 
-class PROP(Model):
-    def __init__(self, n_class=1, name='prop'):
-        super(PROP, self).__init__(name=name)
-        self.dense1 = Dense(n_class, activation='relu')
-
-    def call(self, x):
-        return self.dense1(x)
-
-class MLP(Model):
-    def __init__(self, n_class=7):
-        super(MLP, self).__init__()
-        self.enc = MLPenc()
-        self.clf = CLF(n_class)
-    
-    def call(self, x):
-        x = self.enc(x)
-        return self.clf(x)
-
-## Full models
-class MLPprop(Model):
-    def __init__(self, n_class=7, n_prop=1):
-        super(MLPprop, self).__init__()
-        self.enc = MLPenc()
-        self.clf = CLF(n_class)
-        self.prop = PROP(n_prop)
-    
-    def call(self, x):
-        x = self.enc(x)
-        y = self.clf(x)
-        prop = self.prop(x)
-        return y, prop
-
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
         super(CNN, self).__init__()
@@ -181,31 +99,15 @@ class CNN(Model):
             x = self.enc(x, train=train, bn_trainable=bn_trainable)
         y = self.clf(x)
         return y
-  
-class CNNprop(Model):
-    def __init__(self, n_class=7, c1=32, c2=32):
-        super(CNNprop, self).__init__() 
-        self.enc = CNNenc(c1=c1,c2=c2)
-        self.clf = CLF(n_class)
-        self.prop = PROP(n_class)
-    
-    def call(self, x):
-        x = self.enc(x)
-        y = self.clf(x)
-        prop = self.prop(x)
-        return y, prop
 
 class EWC(Model):
-    def __init__(self, n_class=7, mod='MLP', adapt=False):
+    def __init__(self, n_class=7, adapt=False):
         super(EWC, self).__init__()
-        if mod == 'MLP':
-            self.enc = EWCenc()
+        if adapt:
+            self.top = CNNtop()
+            self.base = CNNbase()
         else:
-            if adapt:
-                self.top = CNNtop()
-                self.base = CNNbase()
-            else:
-                self.enc = CNNenc()
+            self.enc = CNNenc()
         self.clf = CLF(n_class=n_class)
     
     def acc(self, x, y, val_acc=None):

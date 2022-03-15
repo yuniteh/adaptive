@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test, EWC, CNNenc
+from adapt.ml.dl_subclass import CNN, get_train, get_test, EWC, CNNenc
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -199,16 +199,9 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             if isinstance(model,CNN): # adapting CNN
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 trainable = False
-            elif isinstance(model,MLP): # adapting MLP
-                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
-                trainable = False
             elif model == 'cnn': # calibrating CNN
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = CNN(n_class=n_dof, adapt=adapt)
-                trainable = True
-            elif model == 'mlp': # calibrating MLP
-                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
-                model = MLP(n_class=n_dof)
                 trainable = True
             elif isinstance(model,list): # calibrating CNN-LDA
                 ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
