@@ -46,13 +46,10 @@ class VAR(Model):
     
     def get_shapes(self, x):
         x = self.conv1(x)
-        print(tf.shape(x))
         x = self.conv2(x)
-        print(tf.shape(x))
         conv2_s = tf.shape(x)
         x = self.flatten(x)
         flat_s = tf.shape(x)
-        print(tf.shape(x))
         return flat_s, conv2_s
 
 class DEC(Model):
@@ -70,17 +67,12 @@ class DEC(Model):
     def call(self, x):
         x = self.den1(x)
         x = self.bn1(x)
-        print('hi')
-        print(tf.shape(x))
         x = self.den2(x)
         x = self.bn2(x)
-        print(tf.shape(x))
-        # x = tf.reshape(x,self.conv2s)
         x = self.rshape(x)
         x = self.tconv(x)
         x = self.bn3(x)
         x = self.tconv2(x)
-        print(tf.shape(x))
         return x
 
 class CNNenc(Model):
@@ -313,7 +305,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -325,10 +317,10 @@ def get_train():
                 z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
-                loss = class_loss + kl_loss
+                loss = class_loss + kl_loss*lam/100
                 if hasattr(mod,'dec'):
-                    rec_loss = tf.reduce_sum(tf.keras.losses.mean_squared_error(x, x_out))/10
-                    loss += rec_loss
+                    rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
+                    loss += rec_loss*lam
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
@@ -367,7 +359,8 @@ def get_train():
             if hasattr(mod,"F_accum"):
                 sec_loss(f_loss_orig)
             else:
-                sec_loss(kl_loss)
+                sec_loss(rec_loss)
+                third_loss(kl_loss)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:

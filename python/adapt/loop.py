@@ -216,6 +216,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
+            kl_loss = tf.keras.metrics.Mean(name='kl_loss')
             train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
             
             train_mod = get_train()
@@ -226,16 +227,20 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
+                if epoch < 10:
+                    lam_in = 0
+                else:
+                    lam_in = 10
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
                 if print_b:
-                    if epoch == 0 or epoch == ep-1:
-                        print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ',f'Second Loss: {sec_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+                    # if epoch == 0 or epoch == ep-1:
+                    print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ',f'Second Loss: {sec_loss.result():.2f}, ',f'KL Loss: {kl_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
             
             elapsed = time.time() - start_time
             print('time: ' + str(elapsed))
