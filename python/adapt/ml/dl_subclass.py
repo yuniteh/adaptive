@@ -1,11 +1,32 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization
+from tensorflow.keras.layers import Lambda, Dense, Flatten, Conv2D, BatchNormalization
 from tensorflow.keras import Model
 import numpy as np
 import copy as cp
 import matplotlib.pyplot as plt
-from IPython import display
-from collections import deque
+
+class VAR(Model):
+    def __init__(self, latent_dim=4, name='var'):
+        super(VAR,self).__init__(name=name)
+        self.mean = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
+        self.vbn1 = BatchNormalization()
+        self.vbn2 = BatchNormalization()
+        self.reparam = Lambda(self.sampling, output_shape=(latent_dim,))
+
+    def sampling(args):
+        """Reparameterization trick by sampling from an isotropic unit Gaussian.
+        # Arguments
+            args (tensor): mean and log of variance of Q(z|X)
+        # Returns
+            z (tensor): sampled latent vector
+        """
+        z_mean, z_log_var = args
+        batch = tf.keras.shape(z_mean)[0]
+        dim = tf.keras.int_shape(z_mean)[1]
+        # by default, random_normal has mean = 0 and std = 1.0
+        epsilon = tf.math.random_normal(shape=(batch, dim))
+        return z_mean + tf.math.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
@@ -37,7 +58,7 @@ class CNNenc(Model):
         return x
 
 class CNNbase(Model):
-    def __init__(self, latent_dim=4, c2=32,name='enc'):
+    def __init__(self, latent_dim=4, c2=32, name='enc'):
         super(CNNbase, self).__init__(name=name)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same")
         self.bn2 = BatchNormalization()
