@@ -84,7 +84,7 @@ class DEC(Model):
         batch = K.shape(x)[0]
         dim = K.int_shape(x)[1]
         epsilon = K.random_normal(shape=(batch, dim), dtype=x.dtype)
-        return K.exp(0.5) * epsilon
+        return epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
