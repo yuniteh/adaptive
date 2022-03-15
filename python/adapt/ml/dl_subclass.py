@@ -65,7 +65,9 @@ class DEC(Model):
         self.bn3 = BatchNormalization()
         self.tconv2 = Conv2DTranspose(1, 3, activation='relu', padding='same')
 
-    def call(self, x, cls):
+    def call(self, x, cls, samp=False):
+        if samp:
+            x = self.sample(x)
         x2 = tf.tile(cls[...,tf.newaxis],[1,x.shape[1]])
         x = self.cat([x,x2])
         x = self.den1(x)
@@ -77,6 +79,12 @@ class DEC(Model):
         x = self.bn3(x)
         x = self.tconv2(x)
         return x
+    
+    def sample(self,x):
+        batch = K.shape(x)[0]
+        dim = K.int_shape(x)[1]
+        epsilon = K.random_normal(shape=(batch, dim), dtype=x.dtype)
+        return K.exp(0.5) * epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
