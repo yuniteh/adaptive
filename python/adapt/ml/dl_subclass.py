@@ -104,9 +104,9 @@ class CLF(Model):
     def call(self, x):
         return self.dense1(x)
 
-class VAE(Model):
+class VCNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32):
-        super(VAE, self).__init__()
+        super(VCNN, self).__init__()
         self.enc = CNNenc(c1=c1,c2=c2)
         self.var = VAR()
         self.clf = CLF(n_class)
@@ -116,7 +116,7 @@ class VAE(Model):
         z_mean, z_logvar, z = self.var(x)
         y = self.clf(z)
         return y
-        
+
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
         super(CNN, self).__init__()

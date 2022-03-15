@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import CNN, get_train, get_test, EWC, CNNenc
+from adapt.ml.dl_subclass import CNN, VCNN, get_train, get_test
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -196,15 +196,18 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             out.extend([w,c])
         else:
             w_c = None
-            if isinstance(model,CNN): # adapting CNN
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
+            vae = False
+            ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
+            if isinstance(model,CNN) or isinstance(model,VCNN): # adapting CNN
                 trainable = False
             elif model == 'cnn': # calibrating CNN
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = CNN(n_class=n_dof, adapt=adapt)
                 trainable = True
+            elif model == 'vcnn':
+                model = VCNN(n_class=n_dof)
+                trainable = True
+                vae = True
             elif isinstance(model,list): # calibrating CNN-LDA
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 w_c = model[1:3]
                 model = model[0]
 
@@ -222,7 +225,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 train_accuracy.reset_states()
 
                 for x, y, _ in ds:
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, vae=vae)
 
                 if print_b:
                     if epoch == 0 or epoch == ep-1:
@@ -244,7 +247,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 out.extend([w_c,c_c])
     return out
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None):
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
