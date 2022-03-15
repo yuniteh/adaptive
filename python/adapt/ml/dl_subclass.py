@@ -1,4 +1,5 @@
 import tensorflow as tf
+
 from tensorflow.keras.layers import Lambda, Dense, Flatten, Conv2D, BatchNormalization
 from tensorflow.keras import Model
 import numpy as np
@@ -12,21 +13,22 @@ class VAR(Model):
         self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
         self.vbn1 = BatchNormalization()
         self.vbn2 = BatchNormalization()
-        self.reparam = Lambda(self.sampling, output_shape=(latent_dim,))
+    
+    def call(self, x):
+        z_mean = self.mean(x)
+        z_logvar = self.logvar(x)
+        z_mean = self.vbn1(z_mean)
+        z_log_var = self.vbn2(z_logvar)
+        z = self.sampling(z_mean, z_log_var)
+        return z_mean, z_logvar, z
 
-    def sampling(args):
-        """Reparameterization trick by sampling from an isotropic unit Gaussian.
-        # Arguments
-            args (tensor): mean and log of variance of Q(z|X)
-        # Returns
-            z (tensor): sampled latent vector
-        """
-        z_mean, z_log_var = args
-        batch = tf.keras.shape(z_mean)[0]
-        dim = tf.keras.int_shape(z_mean)[1]
+    def sampling(z_mean, z_log_var):
+        #Reparameterization trick by sampling from an isotropic unit Gaussian.
+        batch = tf.shape(z_mean)[0]
+        dim = tf.keras.backend.int_shape(z_mean)[1]
         # by default, random_normal has mean = 0 and std = 1.0
-        epsilon = tf.math.random_normal(shape=(batch, dim))
-        return z_mean + tf.math.exp(0.5 * z_log_var) * epsilon
+        epsilon = tf.random_normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
@@ -102,6 +104,19 @@ class CLF(Model):
     def call(self, x):
         return self.dense1(x)
 
+class VAE(Model):
+    def __init__(self, n_class=7, c1=32, c2=32):
+        super(VAE, self).__init__()
+        self.enc = CNNenc(c1=c1,c2=c2)
+        self.var = VAR()
+        self.clf = CLF(n_class)
+    
+    def call(self, x):
+        x = self.enc(x)
+        z_mean, z_logvar, z = self.var(x)
+        y = self.clf(z)
+        return y
+        
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
         super(CNN, self).__init__()
@@ -240,13 +255,19 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, vae=False):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
+            elif vae:
+                y_out = mod(x,training=True)
+                z_mean, z_log_var, z = mod.var(mod.enc(x,training=True), training=True)
+                class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+                kl_loss = -.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var),axis=-1)
+                loss = class_loss + kl_loss
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
