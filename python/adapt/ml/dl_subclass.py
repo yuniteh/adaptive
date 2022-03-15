@@ -215,12 +215,12 @@ class EWC(Model):
         val_acc(y, y_out)
         return val_acc.result()
     
-    def call(self, x, train=False, trainable=False):
+    def call(self, x, train=False, bn_trainable=False):
         if hasattr(self,'top'):
             x = self.top(x)
             x = self.base(x)
         else:
-            x = self.enc(x, train=train, trainable=trainable)
+            x = self.enc(x, train=train, bn_trainable=bn_trainable)
         return self.clf(x)
 
     def compute_fisher(self, imgset, y, num_samples=200, plot_diffs=False, disp_freq=10):
@@ -304,7 +304,7 @@ def get_fish():
     @tf.function
     def train_fish(x, y, mod):
         with tf.GradientTape() as tape:
-            y_out = mod(x,training=False,train=False,trainable=False)
+            y_out = mod(x,training=False,train=False,bn_trainable=False)
             c_index = tf.argmax(y_out,1)[0]
             if y is None:
                 loss = -tf.math.log(y_out[0,c_index])
@@ -327,7 +327,7 @@ def get_train():
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
-                    y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
+                    y_out = mod(x,training=True,train=True,bn_trainable=trainable)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
@@ -339,8 +339,9 @@ def get_train():
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
-                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        print(mod.trainable_weights[v].dtype)
+                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(mod.trainable_weights[v].dtype),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(mod.trainable_weights[v].dtype),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
                         loss += f_loss             
         
         if adapt:
