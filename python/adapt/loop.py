@@ -187,7 +187,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, adapt=False, print_b=False, lr=0.0001, bat=32):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, adapt=False, print_b=False, lr=0.001, bat=32):
     # Train NNs
     out = []
     for model in mod:
@@ -206,12 +206,11 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             elif model == 'vcnn':
                 model = VCNN(n_class=n_dof)
                 trainable = True
-                vae = True
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
                 model = model[0]
 
-            optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
             
@@ -225,7 +224,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 train_accuracy.reset_states()
 
                 for x, y, _ in ds:
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, vae=vae)
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
                 if print_b:
                     if epoch == 0 or epoch == ep-1:

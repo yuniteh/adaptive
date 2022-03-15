@@ -7,20 +7,34 @@ import copy as cp
 import matplotlib.pyplot as plt
 
 class VAR(Model):
-    def __init__(self, latent_dim=4, name='var'):
+    def __init__(self, latent_dim=4, c1=32, c2=32, name='var'):
         super(VAR,self).__init__(name=name)
+        self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn1 = BatchNormalization()#renorm=True)
+        self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn2 = BatchNormalization()#renorm=True)
+        self.flatten = Flatten()
+        self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn3 = BatchNormalization()#renorm=True)
         self.mean = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
         self.vbn1 = BatchNormalization()
         self.vbn2 = BatchNormalization()
     
     def call(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.flatten(x)
+        x = self.dense1(x)
+        x = self.bn3(x)
         z_mean = self.mean(x)
         z_logvar = self.logvar(x)
         z_mean = self.vbn1(z_mean)
         z_log_var = self.vbn2(z_logvar)
         z = self.sampling(z_mean, z_log_var)
-        return z_mean, z_logvar, z
+        return z_mean, z_log_var, z
 
     def sampling(self, z_mean, z_log_var):
         #Reparameterization trick by sampling from an isotropic unit Gaussian.
@@ -108,14 +122,12 @@ class CLF(Model):
 class VCNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32):
         super(VCNN, self).__init__()
-        self.enc = CNNenc(c1=c1,c2=c2)
-        self.var = VAR()
+        self.var = VAR(c1=c1,c2=c2)
         self.clf = CLF(n_class)
     
     def call(self, x, train=False, bn_trainable=False):
-        x = self.enc(x)
-        z_mean, z_logvar, z = self.var(x)
-        y = self.clf(z)
+        z_mean, z_log_var, z = self.var(x)
+        y = self.clf(z_mean)
         return y
 
 class CNN(Model):
@@ -256,18 +268,18 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, vae=False):
+    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
-            elif vae:
+            elif isinstance(mod,VCNN):
                 y_out = mod(x,training=True)
-                z_mean, z_log_var, z = mod.var(mod.enc(x,training=True), training=True)
+                z_mean, z_log_var, _ = mod.var(x, training=True)
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-                kl_loss = -.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var),axis=-1)
+                kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                 loss = class_loss + kl_loss
             else:
                 if adapt:
