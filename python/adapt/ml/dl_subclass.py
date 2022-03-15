@@ -268,7 +268,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, fish_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -315,8 +315,11 @@ def get_train():
 
         if train_loss is not None:
             train_loss(loss)
-        if fish_loss is not None and hasattr(mod,"F_accum"):
-            fish_loss(f_loss_orig)
+        if sec_loss is not None:
+            if hasattr(mod,"F_accum"):
+                sec_loss(f_loss_orig)
+            else:
+                sec_loss(kl_loss)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:
