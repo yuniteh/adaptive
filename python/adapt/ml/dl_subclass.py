@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Lambda, Dense, Flatten, Conv2D, BatchNormalization
 from tensorflow.keras import Model
 import numpy as np
@@ -22,13 +22,14 @@ class VAR(Model):
         z = self.sampling(z_mean, z_log_var)
         return z_mean, z_logvar, z
 
-    def sampling(z_mean, z_log_var):
+    def sampling(self, z_mean, z_log_var):
         #Reparameterization trick by sampling from an isotropic unit Gaussian.
-        batch = tf.shape(z_mean)[0]
-        dim = tf.keras.backend.int_shape(z_mean)[1]
+        # z_mean, z_log_var = args
+        batch = K.shape(z_mean)[0]
+        dim = K.int_shape(z_mean)[1]
         # by default, random_normal has mean = 0 and std = 1.0
-        epsilon = tf.random_normal(shape=(batch, dim))
-        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+        epsilon = K.random_normal(shape=(batch, dim), dtype=z_mean.dtype)
+        return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
@@ -111,7 +112,7 @@ class VCNN(Model):
         self.var = VAR()
         self.clf = CLF(n_class)
     
-    def call(self, x):
+    def call(self, x, train=False, bn_trainable=False):
         x = self.enc(x)
         z_mean, z_logvar, z = self.var(x)
         y = self.clf(z)
