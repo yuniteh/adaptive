@@ -339,9 +339,8 @@ def get_train():
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
-                        print(mod.trainable_weights[v].dtype)
-                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(mod.trainable_weights[v].dtype),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-                        f_loss = (lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(mod.trainable_weights[v].dtype),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                        f_loss = tf.cast((lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))),loss.dtype)
                         loss += f_loss             
         
         if adapt:
