@@ -115,14 +115,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 print('early stop')
                 break
             
-            # if lams[l] > 0:
-            #     if np.abs(train_diff) < 1e-2 and fish_diff < 0:
-            #         print('early stop')
-            #         break
-            # else:
-            #     if np.abs(train_diff) < 25e-3:
-            #         print('early stop')
-            #         break
+            if lams[l] > 0:
+                if np.abs(train_diff) < 1e-2 and fish_diff < 0:
+                    print('early stop')
+                    break
+            else:
+                if np.abs(train_diff) < 25e-3:
+                    print('early stop')
+                    break
             #     # if np.abs(fish_diff) < 1e-3 and np.abs(train_diff) < 1e-3 and train_loss.result() < 1:
             #     #     # print(str(fish_loss.result().numpy()))
             #     #     # print(str(train_loss.result().numpy()))
@@ -131,7 +131,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
 
             if lams[l] > 0:
                 print('loss:' + str(train_loss.result().numpy()) + ', fish: ' + str(fish_loss.result().numpy()) + ', lam: ' + str(lam_in) + ', rat: ' + str(ratio))
-        print('time: ' + str(time.time()-start_time))
+        elapsed = time.time()-start_time
+        print('time: ' + str(elapsed))
         if cnnlda:
             x_train1 = x_train[:x_train.shape[0]//2,...]
             x_train2 = x_train[x_train.shape[0]//2:,...]
@@ -184,7 +185,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         tf.keras.backend.clear_session()
     plt.show()
     
-    return w, c
+    return w, c, elapsed
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, adapt=False, print_b=False, lr=0.0001, bat=32):
     # Train NNs
@@ -234,8 +235,10 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                     if epoch == 0 or epoch == ep-1:
                         print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
             
-            print('time: ' + str(time.time()-start_time))
-            out.append(model)
+            elapsed = time.time() - start_time
+            print('time: ' + str(elapsed))
+            out.extend([model,elapsed])
+
             tf.keras.backend.clear_session()
 
             if isinstance(model,CNN):
