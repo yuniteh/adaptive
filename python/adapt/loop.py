@@ -187,7 +187,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=True, lr=0.001, bat=32, dec=True):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
     # Train NNs
     out = []
     for model in mod:

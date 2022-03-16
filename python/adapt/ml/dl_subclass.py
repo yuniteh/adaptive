@@ -355,8 +355,8 @@ def get_train():
                 if hasattr(mod,'dec') and dec:
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
-                    rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    loss = rec_loss + kl_loss*lam
+                    rec_loss = K.sum(tf.keras.losses.mean_squared_error(x, x_out))/10
+                    loss += rec_loss + kl_loss*10
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
