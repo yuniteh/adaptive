@@ -187,7 +187,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=True, lr=0.001, bat=32, dec=True):
     # Train NNs
     out = []
     for model in mod:
@@ -212,8 +212,8 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             elif isinstance(model,VCNN):
                 trainable = False
                 if dec:
-                    model.clf.trainable = False
-                    model.var.trainable = False
+                    model.clf.trainable = True
+                    model.var.trainable = True
                     model.dec.trainable = True
                 else:
                     model.clf.trainable = True
@@ -240,13 +240,13 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 train_loss.reset_states()
                 train_accuracy.reset_states()
                 if epoch > 10:
-                    lam_in = 2
+                    lam_in = 5
                 else:
                     lam_in = 1
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in, dec=dec)
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=[.1,lam_in], dec=dec)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 

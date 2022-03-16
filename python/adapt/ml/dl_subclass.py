@@ -36,19 +36,19 @@ class DEC(Model):
         super(DEC,self).__init__(name=name)
         self.den = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn = BatchNormalization()#renorm=True)
-        self.mean = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
+        self.mean = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.logvar = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
         self.vbn1 = BatchNormalization()
         self.vbn2 = BatchNormalization()
         self.cat = Concatenate()
-        self.den1 = Dense(16, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.den1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
         self.den2 = Dense(flat_s[1], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
         self.rshape = Reshape(conv2_s[1:])
         self.tconv = Conv2DTranspose(32, 3, activation='relu', padding='same')
         self.bn3 = BatchNormalization()
-        self.tconv2 = Conv2DTranspose(1, 3, activation='relu', padding='same')
+        self.tconv2 = Conv2DTranspose(1, 3, activation='sigmoid', padding='same')
 
     def call(self, x, cls, samp=False):
         if samp:
@@ -106,7 +106,7 @@ class CNNenc(Model):
         self.flatten = Flatten()
         self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn3 = BatchNormalization()#renorm=True)
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()#renorm=True)
 
     def call(self, x, train=False, bn_trainable=False):
@@ -133,7 +133,7 @@ class CNNbase(Model):
         self.flatten = Flatten()
         self.dense1 = Dense(16, activation='relu')
         self.bn3 = BatchNormalization()
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()
 
     def call(self, x, train=False, bn_trainable=False):
@@ -355,8 +355,9 @@ def get_train():
                 if hasattr(mod,'dec') and dec:
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
-                    rec_loss = K.sum(tf.keras.losses.mean_squared_error(x, x_out))/10
-                    loss += rec_loss + kl_loss*10
+                    # rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
+                    rec_loss = K.sum(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
+                    loss = loss + rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
@@ -385,7 +386,10 @@ def get_train():
                 optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
-                if lam > 0:
+                if not isinstance(mod,VCNN):
+                    if lam > 0:
+                        gradients,_ = tf.clip_by_global_norm(gradients,50000)
+                else:
                     gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
 
@@ -408,7 +412,7 @@ def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None):
         if hasattr(mod, 'dec'):
-            y_out = mod(x,training=False,train=False,bn_trainable=False)[0]
+            y_out = mod(x,training=False,train=False,bn_trainable=False,dec=False)[0]
         else:
             y_out = mod(x,training=False,train=False,bn_trainable=False)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
