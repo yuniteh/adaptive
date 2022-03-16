@@ -38,11 +38,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         else:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         
         # train functions
         train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -196,7 +196,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             w_c = None
             vae = False
             ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
-            if isinstance(model,CNN): # adapting CNN
+            if isinstance(model,CNN):# adapting CNN
                 trainable = False
             elif model == 'cnn': # calibrating CNN
                 model = CNN(n_class=n_dof, adapt=adapt)
@@ -229,6 +229,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 model = model[0]
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
