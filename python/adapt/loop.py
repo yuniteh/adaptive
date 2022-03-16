@@ -181,15 +181,13 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 if l == len(lams)-1:
                     ax[l,i].set_xlabel("Iterations")
                 ax[l,i].set_xlim([0,iter+2])
-                # else:
-                #     ax[l,i].set_xlabel(().set_visible(False)
     
         tf.keras.backend.clear_session()
     plt.show()
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
+def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True, trainable=True):
     # Train NNs
     out = []
     for model in mod:
@@ -210,7 +208,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model(traincnn[:1,...])
                 model.add_dec(traincnn[:1,...])
                 model(traincnn[:2,...],np.ones((2,)),dec=True)
-                trainable = True
                 if dec:
                     model.clf.trainable = False
                     model.var.trainable = True
@@ -220,7 +217,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                     model.var.trainable = True
                     model.dec.trainable = False
             elif isinstance(model,VCNN):
-                trainable = False
                 if dec:
                     model.clf.trainable = False
                     model.var.trainable = True
@@ -256,7 +252,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in, dec=dec)
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, trainable=trainable, lam=lam_in, dec=dec)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
