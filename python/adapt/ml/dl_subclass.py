@@ -15,11 +15,13 @@ class VAR(Model):
         self.bn2 = BatchNormalization()#renorm=True)
         self.flatten = Flatten(dtype="float32")
     
-    def call(self, x):
+    def call(self, x, bn_training=False, bn_trainable=False):
+        self.bn1.trainable=bn_trainable
+        self.bn2.trainable=bn_trainable
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training=bn_training)
         x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.bn2(x,training=bn_training)
         x = self.flatten(x)
         return x
     
@@ -50,7 +52,7 @@ class DEC(Model):
         self.bn3 = BatchNormalization()
         self.tconv2 = Conv2DTranspose(1, 3, activation='sigmoid', padding='same',dtype="float32")
 
-    def call(self, x, cls, samp=False):
+    def call(self, x, cls, samp=False, bn_training=False, bn_trainable=False):
         if samp:
             x = self.sampling(x)
             z_mean = 0
@@ -65,14 +67,17 @@ class DEC(Model):
             x = self.sampling([z_mean, z_logvar])
 
         x2 = tf.cast(tf.tile(cls[...,tf.newaxis],[1,x.shape[1]]),x.dtype)
+        self.bn1.trainable = bn_trainable
+        self.bn2.trainable = bn_trainable
+        self.bn3.trainable = bn_trainable
         x = self.cat([x,x2])
         x = self.den1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training = bn_training)
         x = self.den2(x)
-        x = self.bn2(x)
-        x = tf.reshape(x,[x.shape[0]]+self.conv2_s)#self.rshape(x)
+        x = self.bn2(x,training = bn_training)
+        x = tf.reshape(x,[x.shape[0]]+self.conv2_s)
         x = self.tconv(x)
-        x = self.bn3(x)
+        x = self.bn3(x,training = bn_training)
         x = self.tconv2(x)
         return x, z_mean, z_logvar
 
@@ -163,9 +168,10 @@ class VCLF(Model):
         self.bn1 = BatchNormalization()
         self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
-    def call(self, x):
+    def call(self, x, bn_training=False, bn_trainable=False):
+        self.bn1.trainable = bn_trainable
         x = self.dense1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training = bn_training)
         return self.dense2(x)
 
 ## Classifier
