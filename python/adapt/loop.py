@@ -244,7 +244,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
-                if epoch > 15:
+                if epoch > -1:
                     lam_in = [100,15]
                 else:
                     lam_in = [100,1]
