@@ -245,10 +245,13 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
-                if epoch > 15:
-                    lam_in = [100,15]
+                if ep > 20:
+                    if epoch > 15:
+                        lam_in = [100,15]
+                    else:
+                        lam_in = [100,1]
                 else:
-                    lam_in = [100,1]
+                    lam_in = [100,10]
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
@@ -279,7 +282,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
 def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None, test_mod=None):
     acc = np.empty((5,))
     acc[:] = np.nan
-    test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #test LDA
@@ -290,19 +292,17 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
 
     # test MLP
     if mlp is not None:
-        test_loss.reset_states()
         test_accuracy.reset_states()
         test_mod = get_test()
-        test_mod(x_test_mlp, y_test, mlp, test_loss, test_accuracy,)
+        test_mod(x_test_mlp, y_test, mlp, test_accuracy,)
         acc[1] = test_accuracy.result()*100
     
     # test CNN
     if cnn is not None:
         if clda is None:
-            test_loss.reset_states()
             test_accuracy.reset_states()
             test_mod = get_test()
-            test_mod(x_test_cnn, y_test, cnn, test_loss, test_accuracy)
+            test_mod(x_test_cnn, y_test, cnn, test_accuracy)
             acc[2] = test_accuracy.result()*100
         else:
             w = clda[0]
@@ -311,19 +311,17 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
 
     # test EWC
     if ewc is not None:
-        test_loss.reset_states()
         test_accuracy.reset_states()
         test_mod = get_test()
-        test_mod(x_test_mlp, y_test, ewc, test_loss, test_accuracy)
+        test_mod(x_test_mlp, y_test, ewc, test_accuracy)
         acc[3] = test_accuracy.result()*100
 
     # test EWC
     if ewc_cnn is not None:
         if clda is None:
-            test_loss.reset_states()
             test_accuracy.reset_states()
             test_mod = get_test()
-            test_mod(x_test_cnn, y_test, ewc_cnn, test_loss, test_accuracy)
+            test_mod(x_test_cnn, y_test, ewc_cnn, test_accuracy)
             acc[4] = test_accuracy.result()*100
         else:
             w = clda[0]
