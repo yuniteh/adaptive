@@ -195,7 +195,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             out.extend([w,c])
         else:
             w_c = None
-            vae = False
             ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             if isinstance(model,CNN):# adapting CNN
                 trainable = False
@@ -282,8 +281,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
 def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None, test_mod=None, test_accuracy=None):
     acc = np.empty((2,))
     acc[:] = np.nan
-    if test_accuracy is None:
-        test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #test LDA
     if lda is not None:
@@ -294,9 +291,10 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
     # test CNN
     if cnn is not None:
         if clda is None:
-            test_accuracy.reset_states()
             if test_mod is None:
+                test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
                 test_mod = get_test(cnn, test_accuracy)
+            test_accuracy.reset_states()
             test_mod(tf.convert_to_tensor(x_test_cnn), tf.convert_to_tensor(y_test))
             acc[1] = test_accuracy.result()*100
         else:
