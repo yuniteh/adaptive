@@ -239,7 +239,10 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
-                lam_in = 10
+                if epoch > 10:
+                    lam_in = 2
+                else:
+                    lam_in = 1
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
