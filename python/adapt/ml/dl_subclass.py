@@ -356,7 +356,7 @@ def get_train():
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                     # rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    rec_loss = K.sum(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
+                    rec_loss = tf.reduce_sum(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
                     loss = loss + rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
