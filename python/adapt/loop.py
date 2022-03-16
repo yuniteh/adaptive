@@ -304,18 +304,6 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
             c = clda[1]
             acc[1] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
-    # # test EWC
-    # if ewc_cnn is not None:
-    #     if clda is None:
-    #         test_accuracy.reset_states()
-    #         test_mod = get_test()
-    #         test_mod(x_test_cnn, y_test, ewc_cnn, test_accuracy)
-    #         acc[2] = test_accuracy.result()*100
-    #     else:
-    #         w = clda[0]
-    #         c = clda[1]
-    #         acc[2] = eval_lda(w, c, ewc_cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
-
     return acc
 
 def check_labels(test_data,test_params,train_dof,key):
