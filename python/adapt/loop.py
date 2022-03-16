@@ -214,6 +214,15 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model.add_dec(traincnn[:1,...])
                 model(traincnn[:1,...])
                 trainable = True
+                if dec:
+                    model.clf.trainable = False
+                    model.var.trainable = True
+                    model.dec.trainable = True
+                else:
+                    model.clf.trainable = True
+                    model.var.trainable = True
+                    model.dec.trainable = False
+                    
             elif isinstance(model,VCNN):
                 trainable = False
                 if dec:
