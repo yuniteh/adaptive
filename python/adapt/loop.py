@@ -194,6 +194,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
     # tf.keras.mixed_precision.set_global_policy('mixed_float16') 
     # Train NNs
     out = []
+    # with tf.device('/gpu:0'):
     for model in mod:
         if model == 'lda':
             w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
@@ -244,7 +245,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
-                if epoch > -1:
+                if epoch > 15:
                     lam_in = [100,15]
                 else:
                     lam_in = [100,1]
@@ -275,7 +276,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 out.extend([w_c,c_c])
     return out
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None):
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None, test_mod=None):
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
@@ -352,3 +353,6 @@ def check_labels(test_data,test_params,train_dof,key):
                 test_data = test_data[~ind,...]
     
     return test_data, test_params
+
+
+        

@@ -339,7 +339,7 @@ def get_fish():
     return train_fish
 
 def get_train():
-    @tf.function
+    # @tf.function
     def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
             if prop:
@@ -406,6 +406,35 @@ def get_train():
             train_accuracy(y, y_out)
         if train_prop_accuracy is not None:
             train_prop_accuracy(y_prop, prop_out)
+    
+    return train_step
+
+def get_train2(mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, lam=0, dec=False):
+    # @tf.function
+    def train_step(x, y):
+        with tf.GradientTape() as tape:
+            mod_out = mod(x,training=True, y=tf.argmax(y,axis=-1),dec=dec)
+            y_out = mod_out[0]
+            class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            loss = class_loss 
+            if hasattr(mod,'dec') and dec:
+                _, x_out, z_mean, z_log_var = mod_out
+                kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
+                rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
+                loss = rec_loss*lam[0] + kl_loss*lam[1]          
+        
+        gradients = tape.gradient(loss, mod.trainable_variables)
+        gradients,_ = tf.clip_by_global_norm(gradients,50000)
+        optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
+
+        if train_loss is not None:
+            train_loss(loss)
+        if sec_loss is not None:
+            if dec:
+                sec_loss(rec_loss)
+                third_loss(kl_loss)
+        if train_accuracy is not None:
+            train_accuracy(y, y_out)
     
     return train_step
 

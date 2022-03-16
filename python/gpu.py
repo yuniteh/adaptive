@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 
 def set_gpu():
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -16,6 +17,8 @@ def set_gpu():
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
+
+    # print(device_lib.list_local_devices())
 
     # if gpus:
     # # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
