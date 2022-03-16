@@ -341,10 +341,10 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
             if isinstance(mod,VCNN):
-                mod_out = mod(x,training=True, y=tf.argmax(y,axis=-1),dec=dec)
+                mod_out = mod(x, training=True, y=tf.argmax(y,axis=-1),dec=dec)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 loss = class_loss 
@@ -355,7 +355,7 @@ def get_train():
                     loss = rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
-                    y_out = mod(x,training=True,train=True,bn_trainable=trainable)
+                    y_out = mod(x,training=True, train=True, bn_trainable=trainable)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
@@ -400,15 +400,12 @@ def get_train():
 
 def get_test():
     @tf.function(experimental_relax_shapes=True)
-    def test_step(x, y, mod, test_loss=None, test_accuracy=None):
+    def test_step(x, y, mod, test_accuracy=None):
         if hasattr(mod, 'dec'):
             y_out = mod(x,training=False,train=False,bn_trainable=False,dec=False)[0]
         else:
             y_out = mod(x,training=False,train=False,bn_trainable=False)
-        loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
-        if test_loss is not None:
-            test_loss(loss)
         if test_accuracy is not None:
             test_accuracy(y, y_out)
     
