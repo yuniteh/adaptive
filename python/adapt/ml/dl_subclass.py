@@ -410,7 +410,7 @@ def get_train():
     return train_step
 
 def get_test():
-    @tf.function
+    @tf.function(experimental_relax_shapes=True)
     def test_step(x, y, mod, test_loss=None, test_accuracy=None):
         if hasattr(mod, 'dec'):
             y_out = mod(x,training=False,train=False,bn_trainable=False,dec=False)[0]
