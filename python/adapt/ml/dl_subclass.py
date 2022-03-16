@@ -75,12 +75,6 @@ class DEC(Model):
         x = self.bn3(x)
         x = self.tconv2(x)
         return x, z_mean, z_logvar
-    
-    def sample(self,x):
-        batch = K.shape(x)[0]
-        dim = K.int_shape(x)[1]
-        epsilon = K.random_normal(shape=(batch, dim), dtype=x.dtype)
-        return epsilon
 
     def sampling(self, x):
         #Reparameterization trick by sampling from an isotropic unit Gaussian.
@@ -190,8 +184,9 @@ class VCNN(Model):
         self.clf = VCLF(n_class)
     
     def add_dec(self, x):
-        flat_s, conv2_s = self.var.get_shapes(x)
-        self.dec = DEC(flat_s, conv2_s)
+        if not hasattr(self,'dec'):
+            flat_s, conv2_s = self.var.get_shapes(x)
+            self.dec = DEC(flat_s, conv2_s)
     
     def call(self, x, y=None, train=False, bn_trainable=False, dec=False):
         x = self.var(x)

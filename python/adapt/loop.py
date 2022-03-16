@@ -212,7 +212,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model = VCNN(n_class=n_dof)
                 model(traincnn[:1,...])
                 model.add_dec(traincnn[:1,...])
-                model(traincnn[:1,...])
+                model(traincnn[:2,...],np.ones((2,)),dec=True)
                 trainable = True
                 if dec:
                     model.clf.trainable = False
