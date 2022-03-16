@@ -367,8 +367,8 @@ def get_train():
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
-                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-                        f_loss = tf.cast((lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))),loss.dtype)
+                        f_loss_orig = tf.cast(tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))), loss.dtype)
+                        f_loss = tf.cast((lam/2), loss.dtype) * f_loss_orig
                         loss += f_loss             
         
         if adapt:
@@ -433,9 +433,9 @@ def get_ewc():
     
     return train_step
 
-def get_cnn():
+def get_cnn(mod, optimizer, train_loss=None, train_accuracy=None, adapt=False, clda=None, trainable=True):
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, train_accuracy=None, adapt=False, clda=None, trainable=True):
+    def train_step(x, y):
         with tf.GradientTape() as tape:
             if adapt:
                 y_out = mod(x,training=True, train=True, bn_trainable=trainable)

@@ -22,6 +22,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     lams_all = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     
+    # validation functions
+    val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
+    val_mod = get_test(model,val_accuracy)
+
+    train_ewc = get_train()
 
     for l in range(len(lams)):
         lam_in = np.abs(lams[l])
@@ -42,19 +47,14 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         
         # train functions
-        train_ewc = get_train()
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         fish_loss = tf.keras.metrics.Mean(name='fish_loss')
-
-        # validation functions
-        val_mod = get_test()
-        val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
         
         # initial loss and accuracies
         print(f'Initial', end=' ')
         for task in range(len(x_test)):
             val_accuracy.reset_states()
-            val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+            val_mod(tf.convert_to_tensor(x_test[task]), tf.convert_to_tensor(y_test[task]))
             test_accs[task][0] = val_accuracy.result()
 
             if task < len(x_test)-1:
@@ -105,7 +105,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 f_loss[int(iter/disp_freq)+1,l] = fish_loss.result()
                 for task in range(len(x_test)):
                     val_accuracy.reset_states()
-                    val_mod(x_test[task], y_test[task], model, test_accuracy=val_accuracy)
+                    val_mod(tf.convert_to_tensor(x_test[task]), tf.convert_to_tensor(y_test[task]))
                     test_accs[task][int(iter/disp_freq)+1] = val_accuracy.result()
 
             # early stopping criteria
@@ -279,8 +279,8 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 out.extend([w_c,c_c])
     return out
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None, test_mod=None, test_accuracy=None):
-    acc = np.empty((5,))
+def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None, test_mod=None, test_accuracy=None):
+    acc = np.empty((2,))
     acc[:] = np.nan
     if test_accuracy is None:
         test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
@@ -290,14 +290,6 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
         w = lda[0]
         c = lda[1]
         acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
-
-    # test MLP
-    if mlp is not None:
-        test_accuracy.reset_states()
-        if test_mod is None:
-            test_mod = get_test()
-        test_mod(x_test_mlp, y_test, mlp, test_accuracy)
-        acc[1] = test_accuracy.result()*100
     
     # test CNN
     if cnn is not None:
@@ -306,31 +298,23 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
             if test_mod is None:
                 test_mod = get_test(cnn, test_accuracy)
             test_mod(tf.convert_to_tensor(x_test_cnn), tf.convert_to_tensor(y_test))
-            acc[2] = test_accuracy.result()*100
+            acc[1] = test_accuracy.result()*100
         else:
             w = clda[0]
             c = clda[1]
-            acc[2] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
+            acc[1] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
-    # test EWC
-    if ewc is not None:
-        test_accuracy.reset_states()
-        if test_mod is None:
-            test_mod = get_test()
-        test_mod(x_test_mlp, y_test, ewc, test_accuracy)
-        acc[3] = test_accuracy.result()*100
-
-    # test EWC
-    if ewc_cnn is not None:
-        if clda is None:
-            test_accuracy.reset_states()
-            test_mod = get_test()
-            test_mod(x_test_cnn, y_test, ewc_cnn, test_accuracy)
-            acc[4] = test_accuracy.result()*100
-        else:
-            w = clda[0]
-            c = clda[1]
-            acc[4] = eval_lda(w, c, ewc_cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
+    # # test EWC
+    # if ewc_cnn is not None:
+    #     if clda is None:
+    #         test_accuracy.reset_states()
+    #         test_mod = get_test()
+    #         test_mod(x_test_cnn, y_test, ewc_cnn, test_accuracy)
+    #         acc[2] = test_accuracy.result()*100
+    #     else:
+    #         w = clda[0]
+    #         c = clda[1]
+    #         acc[2] = eval_lda(w, c, ewc_cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
     return acc
 
