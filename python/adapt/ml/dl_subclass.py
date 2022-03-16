@@ -14,37 +14,14 @@ class VAR(Model):
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()#renorm=True)
         self.flatten = Flatten()
-        self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn3 = BatchNormalization()#renorm=True)
-        # self.clf_in = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.mean = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
-        self.vbn1 = BatchNormalization()
-        self.vbn2 = BatchNormalization()
     
     def call(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.conv2(x)
         x = self.bn2(x)
-        clf_in = self.flatten(x)
-        x = self.dense1(clf_in)
-        x = self.bn3(x)
-        # clf_in = self.clf_in(x)
-        z_mean = self.mean(x)
-        z_logvar = self.logvar(x)
-        z_mean = self.vbn1(z_mean)
-        z_log_var = self.vbn2(z_logvar)
-        z = self.sampling(z_mean, z_log_var)
-        return z_mean, z_log_var, z, clf_in
-
-    def sampling(self, z_mean, z_log_var):
-        #Reparameterization trick by sampling from an isotropic unit Gaussian.
-        batch = K.shape(z_mean)[0]
-        dim = K.int_shape(z_mean)[1]
-        # by default, random_normal has mean = 0 and std = 1.0
-        epsilon = K.random_normal(shape=(batch, dim), dtype=z_mean.dtype)
-        return z_mean + K.exp(0.5 * z_log_var) * epsilon
+        x = self.flatten(x)
+        return x
     
     def get_shapes(self, x):
         x = self.conv1(x)
@@ -55,8 +32,14 @@ class VAR(Model):
         return flat_s, conv2_s
 
 class DEC(Model):
-    def __init__(self, flat_s, conv2_s, name='dec'):
+    def __init__(self, flat_s, conv2_s, latent_dim=4,name='dec'):
         super(DEC,self).__init__(name=name)
+        self.den = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn = BatchNormalization()#renorm=True)
+        self.mean = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.logvar = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
+        self.vbn1 = BatchNormalization()
+        self.vbn2 = BatchNormalization()
         self.cat = Concatenate()
         self.den1 = Dense(16, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
@@ -69,7 +52,18 @@ class DEC(Model):
 
     def call(self, x, cls, samp=False):
         if samp:
-            x = self.sample(x)
+            x = self.sampling(x)
+            z_mean = 0
+            z_logvar = 0
+        else:
+            x = self.den(x)
+            x = self.bn(x)
+            z_mean = self.mean(x)
+            z_logvar = self.logvar(x)
+            z_mean = self.vbn1(z_mean)
+            z_logvar = self.vbn2(z_logvar)
+            x = self.sampling([z_mean, z_logvar])
+
         x2 = tf.tile(cls[...,tf.newaxis],[1,x.shape[1]])
         x = self.cat([x,x2])
         x = self.den1(x)
@@ -80,13 +74,27 @@ class DEC(Model):
         x = self.tconv(x)
         x = self.bn3(x)
         x = self.tconv2(x)
-        return x
+        return x, z_mean, z_logvar
     
     def sample(self,x):
         batch = K.shape(x)[0]
         dim = K.int_shape(x)[1]
         epsilon = K.random_normal(shape=(batch, dim), dtype=x.dtype)
         return epsilon
+
+    def sampling(self, x):
+        #Reparameterization trick by sampling from an isotropic unit Gaussian.
+        if isinstance(x,list):
+            z_mean, z_log_var = x
+        else:
+            z_mean = tf.zeros(tf.shape(x))
+            z_log_var = tf.zeros(tf.shape(x))
+
+        batch = K.shape(z_mean)[0]
+        dim = K.int_shape(z_mean)[1]
+        # by default, random_normal has mean = 0 and std = 1.0
+        epsilon = K.random_normal(shape=(batch, dim), dtype=z_mean.dtype)
+        return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
     def __init__(self, latent_dim=4, c1=32, c2=32,name='enc'):
@@ -185,13 +193,14 @@ class VCNN(Model):
         flat_s, conv2_s = self.var.get_shapes(x)
         self.dec = DEC(flat_s, conv2_s)
     
-    def call(self, x, y=None, train=False, bn_trainable=False):
-        x_out = 0
-        z_mean, z_log_var, z, clf_in = self.var(x)
-        y_out = self.clf(clf_in)
-        if hasattr(self,'dec') and y is not None:
-            x_out = self.dec(z, y)
-        return x_out, y_out
+    def call(self, x, y=None, train=False, bn_trainable=False, dec=False):
+        x = self.var(x)
+        y_out = self.clf(x)
+        if dec:
+            x_out, z_mean, z_logvar = self.dec(x, y)
+            return [y_out, x_out, z_mean, z_logvar]
+        else:
+            return [y_out]
 
 class CNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32, adapt=False):
@@ -331,7 +340,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
             if prop:
                 y_out, prop_out = mod(x,training=True)
@@ -339,14 +348,15 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
-                x_out, y_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32))
-                z_mean, z_log_var, _, _ = mod.var(x, training=True)
+                mod_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32),dec=dec)
+                y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-                kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
-                loss = class_loss + kl_loss*lam/10
-                if hasattr(mod,'dec'):
+                loss = class_loss 
+                if hasattr(mod,'dec') and dec:
+                    _, x_out, z_mean, z_log_var = mod_out
+                    kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                     rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    loss += rec_loss*lam
+                    loss = rec_loss + kl_loss
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
@@ -384,7 +394,7 @@ def get_train():
         if sec_loss is not None:
             if hasattr(mod,"F_accum"):
                 sec_loss(f_loss_orig)
-            else:
+            elif dec:
                 sec_loss(rec_loss)
                 third_loss(kl_loss)
         if train_accuracy is not None:

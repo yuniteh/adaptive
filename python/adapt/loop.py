@@ -187,7 +187,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, adapt=False, print_b=True, lr=0.001, bat=32):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=True, lr=0.001, bat=32, dec=True):
     # Train NNs
     out = []
     for model in mod:
@@ -198,7 +198,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             w_c = None
             vae = False
             ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
-            if isinstance(model,CNN) or isinstance(model,VCNN): # adapting CNN
+            if isinstance(model,CNN): # adapting CNN
                 trainable = False
             elif model == 'cnn': # calibrating CNN
                 model = CNN(n_class=n_dof, adapt=adapt)
@@ -209,6 +209,17 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model.add_dec(traincnn[:1,...])
                 model(traincnn[:1,...])
                 trainable = True
+            elif isinstance(model,VCNN):
+                trainable = False
+                if dec:
+                    model.clf.trainable = False
+                    model.var.trainable = False
+                    model.dec.trainable = True
+                else:
+                    model.clf.trainable = True
+                    model.var.trainable = True
+                    model.dec.trainable = False
+                    
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
                 model = model[0]
@@ -223,18 +234,16 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
 
             print('training nn')
             start_time = time.time()
+            
             for epoch in range(ep):
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
-                if epoch < 10:
-                    lam_in = 0
-                else:
-                    lam_in = 10
+                lam_in = 10
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in)
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in, dec=dec)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
