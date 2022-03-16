@@ -194,11 +194,11 @@ class VCNN(Model):
             flat_s, conv2_s = self.var.get_shapes(x)
             self.dec = DEC(flat_s, conv2_s)
     
-    def call(self, x, y=None, train=False, bn_trainable=False, dec=False):
-        x = self.var(x)
-        y_out = self.clf(x)
+    def call(self, x, y=None, bn_training=False, bn_trainable=False, dec=False):
+        x = self.var(x,bn_training=bn_training,bn_trainable=bn_trainable)
+        y_out = self.clf(x,bn_training=bn_training,bn_trainable=bn_trainable)
         if dec:
-            x_out, z_mean, z_logvar = self.dec(x, y)
+            x_out, z_mean, z_logvar = self.dec(x, y, bn_training=bn_training,bn_trainable=bn_trainable)
             return [y_out, x_out, z_mean, z_logvar]
         else:
             return [y_out]
@@ -352,11 +352,9 @@ def get_train():
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                     rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    # rec_loss = K.mean(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
                     loss = rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
-                    # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
                     y_out = mod(x,training=True,train=True,bn_trainable=trainable)
                 else:
                     if clda is not None:
