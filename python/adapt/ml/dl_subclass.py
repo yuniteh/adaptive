@@ -339,7 +339,7 @@ def get_fish():
     return train_fish
 
 def get_train():
-    # @tf.function
+    @tf.function
     def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
             if prop:
