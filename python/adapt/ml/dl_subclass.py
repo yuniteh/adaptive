@@ -162,16 +162,21 @@ class CNNtop(Model):
 
 ## Classifier
 class VCLF(Model):
-    def __init__(self, n_class=7, act='softmax', name='clf'):
+    def __init__(self, n_class=7, latent_dim=4, act='softmax', name='clf'):
         super(VCLF, self).__init__(name=name)
         self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
+        self.latent = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn2 = BatchNormalization()
         self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
     def call(self, x, bn_training=False, bn_trainable=False):
         self.bn1.trainable = bn_trainable
+        self.bn2.trainable = bn_trainable
         x = self.dense1(x)
         x = self.bn1(x,training = bn_training)
+        x = self.latent(x)
+        x = self.bn2(x,training = bn_training)
         return self.dense2(x)
 
 ## Classifier
