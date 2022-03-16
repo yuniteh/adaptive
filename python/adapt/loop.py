@@ -212,7 +212,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             elif isinstance(model,VCNN):
                 trainable = False
                 if dec:
-                    model.clf.trainable = True
+                    model.clf.trainable = False
                     model.var.trainable = True
                     model.dec.trainable = True
                 else:
@@ -246,7 +246,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
 
                 for x, y, _ in ds:
                     if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=[.1,lam_in], dec=dec)
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=[1,lam_in], dec=dec)
                     else:
                         train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 

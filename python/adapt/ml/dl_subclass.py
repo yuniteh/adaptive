@@ -348,16 +348,19 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
-                mod_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32),dec=dec)
+                mod_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32),dec=True)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 loss = class_loss 
-                if hasattr(mod,'dec') and dec:
+                if hasattr(mod,'dec'):
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                     # rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    rec_loss = tf.reduce_sum(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
-                    loss = loss + rec_loss*lam[0] + kl_loss*lam[1]
+                    rec_loss = K.mean(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
+                    if dec:
+                        loss = rec_loss*lam[0] + kl_loss*lam[1]
+                    else:
+                        loss = class_loss#rec_loss + kl_loss
             else:
                 if adapt:
                     # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
