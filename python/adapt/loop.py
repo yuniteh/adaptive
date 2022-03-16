@@ -1,12 +1,14 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import MLP, CNN, get_train, get_test, EWC, CNNenc
+from adapt.ml.dl_subclass import CNN, VCNN, get_train, get_test
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from AdaBound2 import AdaBound as AdaBoundOptimizer
 import copy as cp
 import time
+from tensorflow.keras import mixed_precision
+
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
@@ -187,7 +189,9 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda = False, adapt=False, print_b=False, lr=0.0001, bat=32):
+def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy) 
     # Train NNs
     out = []
     for model in mod:
@@ -196,44 +200,64 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
             out.extend([w,c])
         else:
             w_c = None
+            vae = False
+            ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             if isinstance(model,CNN): # adapting CNN
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
-                trainable = False
-            elif isinstance(model,MLP): # adapting MLP
-                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
                 trainable = False
             elif model == 'cnn': # calibrating CNN
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 model = CNN(n_class=n_dof, adapt=adapt)
                 trainable = True
-            elif model == 'mlp': # calibrating MLP
-                ds = tf.data.Dataset.from_tensor_slices((trainmlp, y_train, y_train)).shuffle(trainmlp.shape[0],reshuffle_each_iteration=True).batch(bat)
-                model = MLP(n_class=n_dof)
+            elif model == 'vcnn':
+                model = VCNN(n_class=n_dof)
+                model(traincnn[:1,...])
+                model.add_dec(traincnn[:1,...])
+                model(traincnn[:1,...])
                 trainable = True
+            elif isinstance(model,VCNN):
+                trainable = False
+                if dec:
+                    model.clf.trainable = False
+                    model.var.trainable = True
+                    model.dec.trainable = True
+                else:
+                    model.clf.trainable = True
+                    model.var.trainable = True
+                    model.dec.trainable = False
+                    
             elif isinstance(model,list): # calibrating CNN-LDA
-                ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
                 w_c = model[1:3]
                 model = model[0]
 
-            optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+            optimizer = mixed_precision.experimental.LossScaleOptimizer(optimizer,loss_scale='dynamic')
             train_loss = tf.keras.metrics.Mean(name='train_loss')
+            sec_loss = tf.keras.metrics.Mean(name='sec_loss')
+            kl_loss = tf.keras.metrics.Mean(name='kl_loss')
             train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
             
             train_mod = get_train()
 
             print('training nn')
             start_time = time.time()
+            
             for epoch in range(ep):
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
+                if epoch > 15:
+                    lam_in = [100,15]
+                else:
+                    lam_in = [100,1]
 
                 for x, y, _ in ds:
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
+                    if isinstance(model,VCNN):
+                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, clda=w_c, trainable=trainable, adapt=adapt, lam=lam_in, dec=dec)
+                    else:
+                        train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
                 if print_b:
-                    if epoch == 0 or epoch == ep-1:
-                        print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
+                    # if epoch == 0 or epoch == ep-1:
+                    print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ',f'Second Loss: {sec_loss.result():.2f}, ',f'KL Loss: {kl_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
             
             elapsed = time.time() - start_time
             print('time: ' + str(elapsed))
@@ -251,7 +275,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 out.extend([w_c,c_c])
     return out
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, cnn_align=None, mlp_align=None, clda=None):
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None):
     acc = np.empty((5,))
     acc[:] = np.nan
     test_loss = tf.keras.metrics.Mean(name='test_loss')
