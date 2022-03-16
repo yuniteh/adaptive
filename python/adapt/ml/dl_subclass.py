@@ -15,11 +15,13 @@ class VAR(Model):
         self.bn2 = BatchNormalization()#renorm=True)
         self.flatten = Flatten(dtype="float32")
     
-    def call(self, x):
+    def call(self, x, bn_training=False, bn_trainable=False):
+        self.bn1.trainable=bn_trainable
+        self.bn2.trainable=bn_trainable
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training=bn_training)
         x = self.conv2(x)
-        x = self.bn2(x)
+        x = self.bn2(x,training=bn_training)
         x = self.flatten(x)
         return x
     
@@ -50,7 +52,7 @@ class DEC(Model):
         self.bn3 = BatchNormalization()
         self.tconv2 = Conv2DTranspose(1, 3, activation='sigmoid', padding='same',dtype="float32")
 
-    def call(self, x, cls, samp=False):
+    def call(self, x, cls, samp=False, bn_training=False, bn_trainable=False):
         if samp:
             x = self.sampling(x)
             z_mean = 0
@@ -65,22 +67,19 @@ class DEC(Model):
             x = self.sampling([z_mean, z_logvar])
 
         x2 = tf.cast(tf.tile(cls[...,tf.newaxis],[1,x.shape[1]]),x.dtype)
+        self.bn1.trainable = bn_trainable
+        self.bn2.trainable = bn_trainable
+        self.bn3.trainable = bn_trainable
         x = self.cat([x,x2])
         x = self.den1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training = bn_training)
         x = self.den2(x)
-        x = self.bn2(x)
-        x = tf.reshape(x,[x.shape[0]]+self.conv2_s)#self.rshape(x)
+        x = self.bn2(x,training = bn_training)
+        x = tf.reshape(x,[x.shape[0]]+self.conv2_s)
         x = self.tconv(x)
-        x = self.bn3(x)
+        x = self.bn3(x,training = bn_training)
         x = self.tconv2(x)
         return x, z_mean, z_logvar
-    
-    def sample(self,x):
-        batch = K.shape(x)[0]
-        dim = K.int_shape(x)[1]
-        epsilon = K.random_normal(shape=(batch, dim), dtype=x.dtype)
-        return epsilon
 
     def sampling(self, x):
         #Reparameterization trick by sampling from an isotropic unit Gaussian.
@@ -169,9 +168,10 @@ class VCLF(Model):
         self.bn1 = BatchNormalization()
         self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
-    def call(self, x):
+    def call(self, x, bn_training=False, bn_trainable=False):
+        self.bn1.trainable = bn_trainable
         x = self.dense1(x)
-        x = self.bn1(x)
+        x = self.bn1(x,training = bn_training)
         return self.dense2(x)
 
 ## Classifier
@@ -190,14 +190,15 @@ class VCNN(Model):
         self.clf = VCLF(n_class)
     
     def add_dec(self, x):
-        flat_s, conv2_s = self.var.get_shapes(x)
-        self.dec = DEC(flat_s, conv2_s)
+        if not hasattr(self,'dec'):
+            flat_s, conv2_s = self.var.get_shapes(x)
+            self.dec = DEC(flat_s, conv2_s)
     
-    def call(self, x, y=None, train=False, bn_trainable=False, dec=False):
-        x = self.var(x)
-        y_out = self.clf(x)
+    def call(self, x, y=None, bn_training=False, bn_trainable=False, dec=False):
+        x = self.var(x,bn_training=bn_training,bn_trainable=bn_trainable)
+        y_out = self.clf(x,bn_training=bn_training,bn_trainable=bn_trainable)
         if dec:
-            x_out, z_mean, z_logvar = self.dec(x, y)
+            x_out, z_mean, z_logvar = self.dec(x, y, bn_training=bn_training,bn_trainable=bn_trainable)
             return [y_out, x_out, z_mean, z_logvar]
         else:
             return [y_out]
@@ -340,15 +341,10 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
-            if prop:
-                y_out, prop_out = mod(x,training=True)
-                class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-                prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
-                loss = class_loss + prop_loss/10
-            elif isinstance(mod,VCNN):
-                mod_out = mod(x,training=True, y=tf.argmax(y,axis=-1),dec=dec)
+            if isinstance(mod,VCNN):
+                mod_out = mod(x, y=tf.argmax(y,axis=-1), training=True, bn_training=True, bn_trainable=trainable, dec=dec)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 loss = class_loss 
@@ -356,25 +352,23 @@ def get_train():
                     _, x_out, z_mean, z_log_var = mod_out
                     kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
                     rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
-                    # rec_loss = K.mean(tf.keras.losses.binary_crossentropy(x, x_out))#*x.shape[1]*x.shape[2]
                     loss = rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
-                    # y_out = mod.clf(mod.base(mod.top(x,training=True, trainable=False),training=False, trainable=False),training=False)
-                    y_out = mod(x,training=True,train=True,bn_trainable=trainable)
+                    y_out = mod(x,training=True, train=True, bn_trainable=trainable)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
                         y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
-                        y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
+                        y_out = mod(x,training=True,train=True,bn_trainable=trainable)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
                 if isinstance(mod, EWC) and hasattr(mod, "F_accum"):
                     for v in range(len(mod.trainable_weights)):
-                        f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
-                        f_loss = tf.cast((lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))),loss.dtype)
+                        f_loss_orig = tf.cast(tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))), loss.dtype)
+                        f_loss = tf.cast((lam/2), loss.dtype) * f_loss_orig
                         loss += f_loss             
         
         if adapt:
@@ -386,12 +380,8 @@ def get_train():
                 optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
-                if not isinstance(mod,VCNN):
-                    if lam > 0:
-                        gradients,_ = tf.clip_by_global_norm(gradients,50000)
-                # else:
-                #     gradients,_ = tf.clip_by_global_norm(gradients,50000)
-                # optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+                if isinstance(mod,EWC) and lam > 0:
+                    gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
 
         if train_loss is not None:
@@ -404,22 +394,112 @@ def get_train():
                 third_loss(kl_loss)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
-        if train_prop_accuracy is not None:
-            train_prop_accuracy(y_prop, prop_out)
     
     return train_step
 
-def get_test():
+def get_ewc():
     @tf.function
-    def test_step(x, y, mod, test_loss=None, test_accuracy=None):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, train_accuracy=None, lam=0, clda=None, trainable=True):
+        with tf.GradientTape() as tape:
+            if clda is not None:
+                mod.clf.trainable = False
+                y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
+            else:
+                y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
+            
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+
+            if hasattr(mod, "F_accum"):
+                for v in range(len(mod.trainable_weights)):
+                    f_loss_orig = tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v])))
+                    f_loss = tf.cast((lam/2) * tf.reduce_sum(tf.multiply(mod.F_accum[v].astype(np.float32),tf.square(mod.trainable_weights[v] - mod.star_vars[v]))),loss.dtype)
+                    loss += f_loss             
+        
+        if clda is not None:
+            gradients = tape.gradient(loss, mod.enc.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
+        else:
+            gradients = tape.gradient(loss, mod.trainable_variables)
+            if isinstance(mod,EWC) and lam > 0:
+                gradients,_ = tf.clip_by_global_norm(gradients,50000)
+            optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
+
+        if train_loss is not None:
+            train_loss(loss)
+        if sec_loss is not None and hasattr(mod,"F_accum"):
+            sec_loss(f_loss_orig)
+        if train_accuracy is not None:
+            train_accuracy(y, y_out)
+    
+    return train_step
+
+def get_cnn(mod, optimizer, train_loss=None, train_accuracy=None, adapt=False, clda=None, trainable=True):
+    @tf.function
+    def train_step(x, y):
+        with tf.GradientTape() as tape:
+            if adapt:
+                y_out = mod(x,training=True, train=True, bn_trainable=trainable)
+            else:
+                if clda is not None:
+                    mod.clf.trainable = False
+                    y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
+                else:
+                    y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
+            
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)       
+        
+        if adapt:
+            gradients = tape.gradient(loss, mod.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+        else:
+            if clda is not None:
+                gradients = tape.gradient(loss, mod.enc.trainable_variables)
+                optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
+            else:
+                gradients = tape.gradient(loss, mod.trainable_variables)
+                optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
+
+        if train_loss is not None:
+            train_loss(loss)
+        if train_accuracy is not None:
+            train_accuracy(y, y_out)
+    
+    return train_step
+
+def get_vcnn():
+    @tf.function
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, lam=[0,0], trainable=True, dec=False):
+        with tf.GradientTape() as tape:
+            mod_out = mod(x, y=tf.argmax(y,axis=-1), training=True, bn_training=True, bn_trainable=trainable, dec=dec)
+            y_out = mod_out[0]
+            loss = tf.keras.losses.categorical_crossentropy(y,y_out)
+            if hasattr(mod,'dec') and dec:
+                _, x_out, z_mean, z_log_var = mod_out
+                kl_loss = -.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var),axis=-1)
+                rec_loss = K.mean(tf.keras.losses.mean_squared_error(x, x_out))
+                loss = rec_loss*lam[0] + kl_loss*lam[1]    
+        
+        gradients = tape.gradient(loss, mod.trainable_variables)
+        optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
+
+        if train_loss is not None:
+            train_loss(loss)
+        if sec_loss is not None and dec:
+            sec_loss(rec_loss)
+            third_loss(kl_loss)
+        if train_accuracy is not None:
+            train_accuracy(y, y_out)
+    
+    return train_step
+
+def get_test(mod, test_accuracy=None):
+    @tf.function(experimental_relax_shapes=True)
+    def test_step(x, y):
         if hasattr(mod, 'dec'):
-            y_out = mod(x,training=False,train=False,bn_trainable=False,dec=False)[0]
+            y_out = mod(x,training=False,bn_training=False,bn_trainable=False,dec=False)[0]
         else:
             y_out = mod(x,training=False,train=False,bn_trainable=False)
-        loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
-        if test_loss is not None:
-            test_loss(loss)
         if test_accuracy is not None:
             test_accuracy(y, y_out)
     
