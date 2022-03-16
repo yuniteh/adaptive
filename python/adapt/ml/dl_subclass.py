@@ -408,7 +408,7 @@ def get_test():
     @tf.function
     def test_step(x, y, mod, test_loss=None, test_accuracy=None):
         if hasattr(mod, 'dec'):
-            x_out, y_out = mod(x,training=False,train=False,bn_trainable=False)
+            y_out = mod(x,training=False,train=False,bn_trainable=False)[0]
         else:
             y_out = mod(x,training=False,train=False,bn_trainable=False)
         loss = tf.keras.losses.categorical_crossentropy(y,y_out)
