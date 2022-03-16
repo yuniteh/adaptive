@@ -361,7 +361,7 @@ def get_train():
                         mod.clf.trainable = False
                         y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
-                        y_out = mod(x,training=True,train=True,bn_trainable=trainable)
+                        y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 

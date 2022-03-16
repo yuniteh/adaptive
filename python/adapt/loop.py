@@ -11,8 +11,9 @@ from tensorflow.keras import mixed_precision
 
     
 # train/compare vanilla sgd and ewc
-def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
+def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=32, clda=None, cnnlda=False):
     # bat = 128
+    bat=32
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
