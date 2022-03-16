@@ -13,7 +13,7 @@ class VAR(Model):
         self.bn1 = BatchNormalization()#renorm=True)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()#renorm=True)
-        self.flatten = Flatten()
+        self.flatten = Flatten(dtype="float32")
     
     def call(self, x):
         x = self.conv1(x)
@@ -38,17 +38,17 @@ class DEC(Model):
         self.bn = BatchNormalization()#renorm=True)
         self.mean = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.logvar = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5),kernel_initializer='zeros',bias_initializer='zeros')
-        self.vbn1 = BatchNormalization()
-        self.vbn2 = BatchNormalization()
+        self.vbn1 = BatchNormalization(dtype="float32")
+        self.vbn2 = BatchNormalization(dtype="float32")
         self.cat = Concatenate()
         self.den1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
         self.den2 = Dense(flat_s[1], activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
-        self.rshape = Reshape(conv2_s[1:])
+        self.conv2_s = conv2_s[1:].numpy().tolist()
         self.tconv = Conv2DTranspose(32, 3, activation='relu', padding='same')
         self.bn3 = BatchNormalization()
-        self.tconv2 = Conv2DTranspose(1, 3, activation='sigmoid', padding='same')
+        self.tconv2 = Conv2DTranspose(1, 3, activation='sigmoid', padding='same',dtype="float32")
 
     def call(self, x, cls, samp=False):
         if samp:
@@ -64,13 +64,13 @@ class DEC(Model):
             z_logvar = self.vbn2(z_logvar)
             x = self.sampling([z_mean, z_logvar])
 
-        x2 = tf.tile(cls[...,tf.newaxis],[1,x.shape[1]])
+        x2 = tf.cast(tf.tile(cls[...,tf.newaxis],[1,x.shape[1]]),x.dtype)
         x = self.cat([x,x2])
         x = self.den1(x)
         x = self.bn1(x)
         x = self.den2(x)
         x = self.bn2(x)
-        x = self.rshape(x)
+        x = tf.reshape(x,[x.shape[0]]+self.conv2_s)#self.rshape(x)
         x = self.tconv(x)
         x = self.bn3(x)
         x = self.tconv2(x)
@@ -167,7 +167,7 @@ class VCLF(Model):
         super(VCLF, self).__init__(name=name)
         self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
-        self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
     def call(self, x):
         x = self.dense1(x)
@@ -348,7 +348,7 @@ def get_train():
                 prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
                 loss = class_loss + prop_loss/10
             elif isinstance(mod,VCNN):
-                mod_out = mod(x,training=True, y=tf.cast(tf.argmax(y,axis=-1),tf.float32),dec=dec)
+                mod_out = mod(x,training=True, y=tf.argmax(y,axis=-1),dec=dec)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 loss = class_loss 
