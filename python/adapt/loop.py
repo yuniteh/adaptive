@@ -187,7 +187,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True, trainable=True):
+def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=128, dec=True, trainable=True):
     # Train NNs
     out = []
     for model in mod:
@@ -301,8 +301,8 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
     if cnn is not None:
         if clda is None:
             test_accuracy.reset_states()
-            test_mod = get_test()
-            test_mod(x_test_cnn, y_test, cnn, test_accuracy)
+            test_mod = get_test(cnn, test_accuracy)
+            test_mod(tf.convert_to_tensor(x_test_cnn), tf.convert_to_tensor(y_test))
             acc[2] = test_accuracy.result()*100
         else:
             w = clda[0]

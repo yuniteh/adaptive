@@ -380,9 +380,8 @@ def get_train():
                 optimizer.apply_gradients(zip(gradients, mod.enc.trainable_variables))
             else:
                 gradients = tape.gradient(loss, mod.trainable_variables)
-                if not isinstance(mod,VCNN):
-                    if lam > 0:
-                        gradients,_ = tf.clip_by_global_norm(gradients,50000)
+                if isinstance(mod,EWC) and lam > 0:
+                    gradients,_ = tf.clip_by_global_norm(gradients,50000)
                 optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
 
         if train_loss is not None:
@@ -398,9 +397,9 @@ def get_train():
     
     return train_step
 
-def get_test():
+def get_test(mod,test_accuracy=None):
     @tf.function(experimental_relax_shapes=True)
-    def test_step(x, y, mod, test_accuracy=None):
+    def test_step(x, y):
         if hasattr(mod, 'dec'):
             y_out = mod(x,training=False,bn_training=False,bn_trainable=False,dec=False)[0]
         else:
