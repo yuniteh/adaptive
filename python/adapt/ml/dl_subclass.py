@@ -341,14 +341,9 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, train_prop_accuracy=None, y_prop=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, prop=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
-            if prop:
-                y_out, prop_out = mod(x,training=True)
-                class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
-                prop_loss = tf.keras.losses.mean_squared_error(y_prop,prop_out)
-                loss = class_loss + prop_loss/10
-            elif isinstance(mod,VCNN):
+            if isinstance(mod,VCNN):
                 mod_out = mod(x,training=True, y=tf.argmax(y,axis=-1),dec=dec)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
@@ -390,9 +385,6 @@ def get_train():
                 if not isinstance(mod,VCNN):
                     if lam > 0:
                         gradients,_ = tf.clip_by_global_norm(gradients,50000)
-                # else:
-                #     gradients,_ = tf.clip_by_global_norm(gradients,50000)
-                # optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
                 optimizer.apply_gradients((grad, var) for (grad, var) in zip(gradients, mod.trainable_variables) if grad is not None)
 
         if train_loss is not None:
@@ -405,8 +397,6 @@ def get_train():
                 third_loss(kl_loss)
         if train_accuracy is not None:
             train_accuracy(y, y_out)
-        if train_prop_accuracy is not None:
-            train_prop_accuracy(y_prop, prop_out)
     
     return train_step
 
