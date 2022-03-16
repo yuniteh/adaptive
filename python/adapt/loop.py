@@ -7,6 +7,8 @@ from sklearn.utils import shuffle
 from AdaBound2 import AdaBound as AdaBoundOptimizer
 import copy as cp
 import time
+from tensorflow.keras import mixed_precision
+
     
 # train/compare vanilla sgd and ewc
 def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=None, lams=[0], plot_loss=True, bat=128, clda=None, cnnlda=False):
@@ -188,6 +190,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     return w, c, elapsed
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
+    policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
+    tf.keras.mixed_precision.experimental.set_policy(policy) 
     # Train NNs
     out = []
     for model in mod:
@@ -225,6 +229,7 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model = model[0]
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+            optimizer = mixed_precision.experimental.LossScaleOptimizer(optimizer,loss_scale='dynamic')
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
