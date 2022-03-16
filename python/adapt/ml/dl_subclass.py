@@ -344,7 +344,7 @@ def get_train():
     def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, lam=0, clda=None, trainable=True, dec=False):
         with tf.GradientTape() as tape:
             if isinstance(mod,VCNN):
-                mod_out = mod(x, training=True, y=tf.argmax(y,axis=-1),dec=dec)
+                mod_out = mod(x, y=tf.argmax(y,axis=-1), training=True, bn_training=True, bn_trainable=trainable, dec=dec)
                 y_out = mod_out[0]
                 class_loss = tf.keras.losses.categorical_crossentropy(y,y_out)
                 loss = class_loss 
@@ -402,7 +402,7 @@ def get_test():
     @tf.function(experimental_relax_shapes=True)
     def test_step(x, y, mod, test_accuracy=None):
         if hasattr(mod, 'dec'):
-            y_out = mod(x,training=False,train=False,bn_trainable=False,dec=False)[0]
+            y_out = mod(x,training=False,bn_training=False,bn_trainable=False,dec=False)[0]
         else:
             y_out = mod(x,training=False,train=False,bn_trainable=False)
 

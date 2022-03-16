@@ -190,11 +190,8 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     return w, c, elapsed
 
 def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=32, dec=True):
-    # policy = tf.keras.mixed_precision.experimental.Policy('mixed_float16')
-    # tf.keras.mixed_precision.set_global_policy('mixed_float16') 
     # Train NNs
     out = []
-    # with tf.device('/gpu:0'):
     for model in mod:
         if model == 'lda':
             w,c, _, _, _, _, _ = train_lda(x_train_lda,y_train_lda)
@@ -222,7 +219,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                     model.clf.trainable = True
                     model.var.trainable = True
                     model.dec.trainable = False
-                    
             elif isinstance(model,VCNN):
                 trainable = False
                 if dec:
@@ -239,7 +235,6 @@ def train_models(traincnn=None, trainmlp=None, y_train=None, x_train_lda=None, y
                 model = model[0]
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-            # optimizer = mixed_precision.LossScaleOptimizer(optimizer)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
