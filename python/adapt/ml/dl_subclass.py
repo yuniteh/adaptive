@@ -105,7 +105,7 @@ class CNNenc(Model):
         self.flatten = Flatten()
         self.dense1 = Dense(16, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn3 = BatchNormalization()#renorm=True)
-        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()#renorm=True)
 
     def call(self, x, train=False, bn_trainable=False):
@@ -361,7 +361,7 @@ def get_train():
                         mod.clf.trainable = False
                         y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
-                        y_out = mod(x,training=True,train=trainable,bn_trainable=trainable)
+                        y_out = mod(x,training=True,train=True,bn_trainable=trainable)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
