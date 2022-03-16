@@ -1,12 +1,11 @@
 from re import A
 import numpy as np
 import scipy.io 
-import pandas as pd
 import copy as cp
 import pickle
 import os
 from datetime import date
-from keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
@@ -49,12 +48,6 @@ def process_daq(daq,params,win=200,ch=6):
         trial_data[:,:,trial] = daq[sub-1,0][0,grp-1][ind-1:ind+win-1,:]
     
     return trial_data
-
-def process_df(params):
-    df = pd.DataFrame(data=params,columns=['sub','trial','ind','group','class','pos'])
-    df = df.set_index('sub')
-    
-    return df
 
 def load_noise_data(filename):
     struct = scipy.io.loadmat(filename)
