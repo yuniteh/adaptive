@@ -279,10 +279,11 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 out.extend([w_c,c_c])
     return out
 
-def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None, test_mod=None):
+def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None, lda=None, ewc=None, ewc_cnn=None, clda=None, test_mod=None, test_accuracy=None):
     acc = np.empty((5,))
     acc[:] = np.nan
-    test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
+    if test_accuracy is None:
+        test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #test LDA
     if lda is not None:
@@ -293,15 +294,17 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
     # test MLP
     if mlp is not None:
         test_accuracy.reset_states()
-        test_mod = get_test()
-        test_mod(x_test_mlp, y_test, mlp, test_accuracy,)
+        if test_mod is None:
+            test_mod = get_test()
+        test_mod(x_test_mlp, y_test, mlp, test_accuracy)
         acc[1] = test_accuracy.result()*100
     
     # test CNN
     if cnn is not None:
         if clda is None:
             test_accuracy.reset_states()
-            test_mod = get_test(cnn, test_accuracy)
+            if test_mod is None:
+                test_mod = get_test(cnn, test_accuracy)
             test_mod(tf.convert_to_tensor(x_test_cnn), tf.convert_to_tensor(y_test))
             acc[2] = test_accuracy.result()*100
         else:
@@ -312,7 +315,8 @@ def test_models(x_test_cnn, x_test_mlp, x_lda, y_test, y_lda, cnn=None, mlp=None
     # test EWC
     if ewc is not None:
         test_accuracy.reset_states()
-        test_mod = get_test()
+        if test_mod is None:
+            test_mod = get_test()
         test_mod(x_test_mlp, y_test, ewc, test_accuracy)
         acc[3] = test_accuracy.result()*100
 
