@@ -26,8 +26,6 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     val_accuracy = tf.keras.metrics.CategoricalAccuracy(name='val_accuracy')
     val_mod = get_test(model,val_accuracy)
 
-    train_ewc = get_train()
-
     for l in range(len(lams)):
         lam_in = np.abs(lams[l])
         if lams[l] > 0:
@@ -40,16 +38,16 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         else:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         
         # train functions
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         fish_loss = tf.keras.metrics.Mean(name='fish_loss')
-        
+        train_ewc = get_train()
         # initial loss and accuracies
         print(f'Initial', end=' ')
         for task in range(len(x_test)):
