@@ -186,7 +186,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.0001, bat=128, dec=True, trainable=True):
+def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=128, dec=True, trainable=True):
     # Train NNs
     out = []
     for model in mod:
@@ -229,7 +229,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 model = model[0]
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
@@ -244,6 +244,9 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
+                sec_loss.reset_states()
+                kl_loss.reset_states()
+                
                 if ep > 20:
                     if epoch > 15:
                         lam_in = [100,15]
