@@ -89,6 +89,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         # shuffle data to make even batches
         x_train_noise, y_train_noise = shuffle(x_train_noise, y_train_noise, random_state = 0)
     else:
+        print(x_train_clean.shape)
         x_train_noise = cp.deepcopy(x_train_clean)
         y_train_noise = cp.deepcopy(y_train_clean)
 

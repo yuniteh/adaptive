@@ -249,9 +249,9 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 
                 if ep > 20:
                     if epoch > 15:
-                        lam_in = [100,15]
+                        lam_in = [1,2]
                     else:
-                        lam_in = [100,1]
+                        lam_in = [1,2]
                 else:
                     lam_in = [100,10]
 
