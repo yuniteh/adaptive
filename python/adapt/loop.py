@@ -208,20 +208,20 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 model(traincnn[:2,...],np.ones((2,)),dec=True)
                 if dec:
                     model.clf.trainable = False
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = True
                 else:
                     model.clf.trainable = True
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = False
             elif isinstance(model,VCNN):
                 if dec:
                     model.clf.trainable = False
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = True
                 else:
                     model.clf.trainable = True
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = False
                     
             elif isinstance(model,list): # calibrating CNN-LDA

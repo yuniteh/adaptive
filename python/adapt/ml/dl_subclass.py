@@ -191,16 +191,16 @@ class CLF(Model):
 class VCNN(Model):
     def __init__(self, n_class=7, c1=32, c2=32):
         super(VCNN, self).__init__()
-        self.var = VAR(c1=c1,c2=c2)
+        self.enc = VAR(c1=c1,c2=c2)
         self.clf = VCLF(n_class)
     
     def add_dec(self, x):
         if not hasattr(self,'dec'):
-            flat_s, conv2_s = self.var.get_shapes(x)
+            flat_s, conv2_s = self.enc.get_shapes(x)
             self.dec = DEC(flat_s, conv2_s)
     
     def call(self, x, y=None, bn_training=False, bn_trainable=False, dec=False):
-        x = self.var(x,bn_training=bn_training,bn_trainable=bn_trainable)
+        x = self.enc(x,bn_training=bn_training,bn_trainable=bn_trainable)
         y_out = self.clf(x,bn_training=bn_training,bn_trainable=bn_trainable)
         if dec:
             x_out, z_mean, z_logvar = self.dec(x, y, bn_training=bn_training,bn_trainable=bn_trainable)
