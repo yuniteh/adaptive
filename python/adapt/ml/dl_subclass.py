@@ -215,8 +215,10 @@ class CNN(Model):
             self.top = CNNtop(c1=c1)
             self.base = CNNbase(c2=c2)
         else:
-            self.enc = CNNenc(c1=c1,c2=c2)
-        self.clf = CLF(n_class)
+            self.enc = VAR(c1=c1,c2=c2)
+            # self.enc = CNNenc(c1=c1,c2=c2)
+        # self.clf = CLF(n_class)
+        self.clf = VCLF(n_class)
     
     def call(self, x, train=False, bn_trainable=False):
         if hasattr(self,'top'):
