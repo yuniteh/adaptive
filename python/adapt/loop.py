@@ -186,7 +186,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.0001, bat=128, dec=True, trainable=True):
+def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=128, dec=True, trainable=True):
     # Train NNs
     out = []
     for model in mod:
@@ -195,7 +195,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             out.extend([w,c])
         else:
             w_c = None
-            vae = False
             ds = tf.data.Dataset.from_tensor_slices((traincnn, y_train, y_train)).shuffle(traincnn.shape[0],reshuffle_each_iteration=True).batch(bat)
             if isinstance(model,CNN):# adapting CNN
                 trainable = False
@@ -230,7 +229,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 model = model[0]
 
             optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
@@ -245,11 +244,14 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 # Reset the metrics at the start of the next epoch
                 train_loss.reset_states()
                 train_accuracy.reset_states()
+                sec_loss.reset_states()
+                kl_loss.reset_states()
+                
                 if ep > 20:
                     if epoch > 15:
-                        lam_in = [100,15]
+                        lam_in = [1,2]
                     else:
-                        lam_in = [100,1]
+                        lam_in = [1,2]
                 else:
                     lam_in = [100,10]
 
@@ -282,8 +284,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
 def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None, test_mod=None, test_accuracy=None):
     acc = np.empty((2,))
     acc[:] = np.nan
-    if test_accuracy is None:
-        test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #test LDA
     if lda is not None:
@@ -294,27 +294,16 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
     # test CNN
     if cnn is not None:
         if clda is None:
-            test_accuracy.reset_states()
             if test_mod is None:
+                test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
                 test_mod = get_test(cnn, test_accuracy)
+            test_accuracy.reset_states()
             test_mod(tf.convert_to_tensor(x_test_cnn), tf.convert_to_tensor(y_test))
             acc[1] = test_accuracy.result()*100
         else:
             w = clda[0]
             c = clda[1]
             acc[1] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
-
-    # # test EWC
-    # if ewc_cnn is not None:
-    #     if clda is None:
-    #         test_accuracy.reset_states()
-    #         test_mod = get_test()
-    #         test_mod(x_test_cnn, y_test, ewc_cnn, test_accuracy)
-    #         acc[2] = test_accuracy.result()*100
-    #     else:
-    #         w = clda[0]
-    #         c = clda[1]
-    #         acc[2] = eval_lda(w, c, ewc_cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
     return acc
 
