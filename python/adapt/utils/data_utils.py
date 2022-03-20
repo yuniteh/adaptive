@@ -128,6 +128,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # LDA data
     y_train_lda = params[:,[0]] - 1
     x_train_lda = extract_feats_caps(x_orig,ft=ft)
+    y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
+    x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
 
     return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
@@ -167,6 +169,8 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
     # LDA data
     y_lda = params[:,[0]] - 1
     x_lda = extract_feats_caps(x_orig,ft=ft)
+    # y_lda = np.argmax(y_train_noise,axis=1)
+    # x_lda = extract_feats_caps(x_train_noise,ft=ft)
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
@@ -205,7 +209,8 @@ def add_noise_caps(raw, params,num_classes=None):
                 ch_ind = 0
                 for i in ch_all[ch]:       
                     if rep_i == 0:
-                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = 0
+                        # print(np.random.normal(0,.001,temp.shape[2]).shape)
+                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = np.random.normal(0,.001,temp.shape[2]) #0
                         temp[(6*ch+2)*ch_split:(6*ch+3)*ch_split,i,:] += np.sin(2*np.pi*60*x)
                         temp[(6*ch+3)*ch_split:(6*ch+4)*ch_split,i,:] += 2*np.sin(2*np.pi*60*x)
                         temp[(6*ch+4)*ch_split:(6*ch+5)*ch_split,i,:] += 3*np.sin(2*np.pi*60*x) 
@@ -213,7 +218,7 @@ def add_noise_caps(raw, params,num_classes=None):
                         temp_split = temp[(6*ch+1)*ch_split:(6*ch+2)*ch_split,i,:]
                         for temp_iter in range(ch_split):
                             if ch_noise[temp_iter,ch_ind] == 0:
-                                temp_split[temp_iter,...] = 0
+                                temp_split[temp_iter,...] = np.random.normal(0,.001,temp.shape[2]) #0
                             elif ch_noise[temp_iter,ch_ind] == 1:
                                 temp_split[temp_iter,...] += np.random.normal(0,ch_level[temp_iter,ch_ind]+1,temp.shape[2])
                             else:
@@ -308,10 +313,13 @@ def extract_feats_caps(raw,ft='feat',uint=False,order=6):
 
         feat_out = np.concatenate([mav,wl,zc,ssc],-1)
         feat_out = feat_out/200
+        # if not uint:
+        #     feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
 
         if ft == 'tdar':
             AR = np.zeros((samp,raw.shape[1],order))
             for ch in range(raw.shape[1]):
+                # print(matAR(raw[:,ch,:],order).shape)
                 AR[:,ch,:] = np.squeeze(matAR(raw[:,ch,:],order))
                 # AR[:,ch,:] = np.squeeze(matAR_ch(raw[:,ch,:],order))
             reg_out = np.real(AR.transpose(0,2,1)).reshape((samp,-1))
@@ -320,8 +328,8 @@ def extract_feats_caps(raw,ft='feat',uint=False,order=6):
         feat_out = mav
         feat_out = feat_out/200
 
-    if not uint:
-        feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
+        if not uint:
+            feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
 
     return feat_out
 
@@ -497,11 +505,9 @@ def matAR1(data,order):
 
     return AR[1:,0]
 
-
-
 def matAR(data,order):
     samp = data.shape[0]
-    data = data.astype('float32')*10/(2**16-1)-5
+    # data = data.astype('float32')*10/(2**16-1)-5
     AR = np.zeros((order+1,samp))
     K = np.zeros((order+1,samp))
     AR[0,:] = 1
@@ -531,6 +537,5 @@ def matAR(data,order):
             AR[k,:] = AR[k,:] + tmp[:,k-1]
 
         AR[i+2,:] = K[i+1,:]
-    print('hi')
 
     return AR[1:,:].T
