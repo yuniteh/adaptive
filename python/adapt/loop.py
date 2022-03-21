@@ -77,7 +77,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             if lams[l] > 0:
                 if iter < 5:
                     # lam_in = lam_array[iter]
-                    lam_in = 0
+                    lam_in = lams[l]
                 else:
                     lam_in = lams[l]
 
@@ -310,6 +310,7 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 def check_labels(test_data,test_params,train_dof,key):
     # check classes trained vs tested
     test_dof = np.unique(test_params[:,2])
+
     test_key = np.empty(test_dof.shape)
     for dof_i in range(len(test_dof)):
         test_key[dof_i] = test_params[np.argmax(test_params[:,2] == test_dof[dof_i]),0]

@@ -128,8 +128,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # LDA data
     y_train_lda = params[:,[0]] - 1
     x_train_lda = extract_feats_caps(x_orig,ft=ft)
-    y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
-    x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
+    # y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
+    # x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
 
     return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 

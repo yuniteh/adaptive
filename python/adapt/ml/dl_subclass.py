@@ -34,7 +34,7 @@ class VAR(Model):
         return flat_s, conv2_s
 
 class DEC(Model):
-    def __init__(self, flat_s, conv2_s, latent_dim=16,name='dec'):
+    def __init__(self, flat_s, conv2_s, latent_dim=8,name='dec'):
         super(DEC,self).__init__(name=name)
         self.den = Dense(32, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn = BatchNormalization()#renorm=True)
