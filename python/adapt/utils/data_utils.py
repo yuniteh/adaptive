@@ -80,8 +80,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
             emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-    print(num_classes)
-    print(np.unique(params[:,0]))
+    # print(num_classes)
+    # print(np.unique(params[:,0]))
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
     x_train_clean, y_train_clean = shuffle(x_train,y,random_state=0)
 
