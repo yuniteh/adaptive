@@ -80,6 +80,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
             emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
+    # print(num_classes)
+    # print(np.unique(params[:,0]))
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
     x_train_clean, y_train_clean = shuffle(x_train,y,random_state=0)
 
@@ -89,7 +91,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         # shuffle data to make even batches
         x_train_noise, y_train_noise = shuffle(x_train_noise, y_train_noise, random_state = 0)
     else:
-        print(x_train_clean.shape)
         x_train_noise = cp.deepcopy(x_train_clean)
         y_train_noise = cp.deepcopy(y_train_clean)
 
@@ -129,6 +130,8 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # LDA data
     y_train_lda = params[:,[0]] - 1
     x_train_lda = extract_feats_caps(x_orig,ft=ft)
+    # y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
+    # x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
 
     return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
 
@@ -142,6 +145,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
         p_test_half = params[(params[:,1]%2!=0) & (params[:,2] !=1),...]
         params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_test_half))
 
+    print(num_classes)
     x, params = shuffle(x, params, random_state = 0)
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
 
@@ -168,6 +172,8 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
     # LDA data
     y_lda = params[:,[0]] - 1
     x_lda = extract_feats_caps(x_orig,ft=ft)
+    # y_lda = np.argmax(y_train_noise,axis=1)
+    # x_lda = extract_feats_caps(x_train_noise,ft=ft)
 
     return y_test, x_test_mlp, x_test_cnn, x_lda, y_lda
 
@@ -206,7 +212,8 @@ def add_noise_caps(raw, params,num_classes=None):
                 ch_ind = 0
                 for i in ch_all[ch]:       
                     if rep_i == 0:
-                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = 0
+                        # print(np.random.normal(0,.001,temp.shape[2]).shape)
+                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = np.random.normal(0,.001,temp.shape[2]) #0
                         temp[(6*ch+2)*ch_split:(6*ch+3)*ch_split,i,:] += np.sin(2*np.pi*60*x)
                         temp[(6*ch+3)*ch_split:(6*ch+4)*ch_split,i,:] += 2*np.sin(2*np.pi*60*x)
                         temp[(6*ch+4)*ch_split:(6*ch+5)*ch_split,i,:] += 3*np.sin(2*np.pi*60*x) 
@@ -214,7 +221,7 @@ def add_noise_caps(raw, params,num_classes=None):
                         temp_split = temp[(6*ch+1)*ch_split:(6*ch+2)*ch_split,i,:]
                         for temp_iter in range(ch_split):
                             if ch_noise[temp_iter,ch_ind] == 0:
-                                temp_split[temp_iter,...] = 0
+                                temp_split[temp_iter,...] = np.random.normal(0,.001,temp.shape[2]) #0
                             elif ch_noise[temp_iter,ch_ind] == 1:
                                 temp_split[temp_iter,...] += np.random.normal(0,ch_level[temp_iter,ch_ind]+1,temp.shape[2])
                             else:
@@ -308,19 +315,24 @@ def extract_feats_caps(raw,ft='feat',uint=False,order=6):
         wl = np.sum(np.abs(next - raw_demean[...,:-1]), axis=2)
 
         feat_out = np.concatenate([mav,wl,zc,ssc],-1)
+        feat_out = feat_out/200
+        # if not uint:
+        #     feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
 
         if ft == 'tdar':
             AR = np.zeros((samp,raw.shape[1],order))
             for ch in range(raw.shape[1]):
-                AR[:,ch,:] = np.squeeze(matAR_ch(raw[:,ch,:],order))
+                # print(matAR(raw[:,ch,:],order).shape)
+                AR[:,ch,:] = np.squeeze(matAR(raw[:,ch,:],order))
+                # AR[:,ch,:] = np.squeeze(matAR_ch(raw[:,ch,:],order))
             reg_out = np.real(AR.transpose(0,2,1)).reshape((samp,-1))
             feat_out = np.hstack([feat_out,reg_out])
     else:
         feat_out = mav
-    feat_out = feat_out/200
+        feat_out = feat_out/200
 
-    if not uint:
-        feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
+        if not uint:
+            feat_out[...,:ch*2] = (2**16-1)*feat_out[...,:ch*2]/10
 
     return feat_out
 
@@ -461,3 +473,72 @@ def matAR_ch(data,order):
     
     AR = np.nan_to_num(AR).T
     return AR[:,1:]
+
+def matAR1(data,order):
+    data = data.astype('float32')*10/(2**16-1)-5
+    AR = np.zeros((order+1,1))
+    K = np.zeros((order+1,1))
+    AR[0,0] = 1
+    R0 = np.dot(data,data)
+    R = np.zeros((1,order))
+    for i in range(order):
+        R[0,i] = np.dot(data[:-1*(i+1)],data[i+1:])
+    E = cp.deepcopy(R0)
+    AR[1,0] = -R[0,0]/R0
+    K[0,0] = AR[1,0]
+    q = R[0,0]
+    tmp = np.zeros((1,order))
+
+    for i in range(order-1):
+        E += q*K[i,0]
+        q = R[0,i+1]
+        S = 0
+        for k in range(i+1):
+            S += R[0,k] * AR[i+1-k,0]
+
+        q += S
+        K[i+1,0] = -q/E
+        for k in range(i+1):
+            tmp[0,k] = K[i+1,0] * AR[i+1-k,0]
+
+        for k in range(1,i+2):
+            AR[k,0] = AR[k,0] + tmp[0,k-1]
+
+        AR[i+2,0] = K[i+1,0]
+
+    return AR[1:,0]
+
+def matAR(data,order):
+    samp = data.shape[0]
+    # data = data.astype('float32')*10/(2**16-1)-5
+    AR = np.zeros((order+1,samp))
+    K = np.zeros((order+1,samp))
+    AR[0,:] = 1
+    R0 = np.sum(np.multiply(data,data),axis=1)
+    R = np.zeros((samp,order))
+    for i in range(order):
+        R[:,i] = np.sum(np.multiply(data[:,:-1*(i+1)],data[:,i+1:]),axis=1)
+    E = cp.deepcopy(R0)
+    AR[1,:] = -R[:,0]/R0
+    K[0,:] = AR[1,:]
+    q = cp.deepcopy(R[:,0])
+    tmp = np.zeros((samp,order))
+
+    for i in range(order-1):
+        E += np.multiply(q,K[i,:].T)
+        q = cp.deepcopy(R[:,i+1])
+        S = np.zeros((samp,))
+        for k in range(i+1):
+            S[:] += np.multiply(R[:,k],AR[i+1-k,:].T)
+
+        q += S
+        K[i+1,:] = -q/E
+        for k in range(i+1):
+            tmp[:,k] = np.multiply(K[i+1,:],AR[i+1-k,:])
+
+        for k in range(1,i+2):
+            AR[k,:] = AR[k,:] + tmp[:,k-1]
+
+        AR[i+2,:] = K[i+1,:]
+
+    return AR[1:,:].T
