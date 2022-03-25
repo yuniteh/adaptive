@@ -546,18 +546,20 @@ def matAR(data,order):
 def update_mean(data,label,N=0,mu_class=None,std_class=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
-    m = data.shape[1:]
-    u_class = np.unique(label)
+    m = list(data.shape[1:])
+    u_class = np.unique(np.argmax(label,axis=1))
     n_class = u_class.shape[0]
+    m.insert(0,n_class)
+    if mu_class is None:
+        mu_class = np.zeros(m)
+        std_class = np.zeros(m)
+        N = np.zeros([n_class,])
+
     ALPHA = np.zeros(N.shape)
     N_new = np.zeros((n_class,))
-    if mu_class is None:
-        mu_class = np.zeros([n_class,m])
-        std_class = np.zeros([n_class,m])
-        N = np.zeros([n_class,])
     
     for i in range(0, n_class):
-        ind = np.squeeze(label == u_class[i])
+        ind = np.squeeze(np.argmax(label,axis=1) == u_class[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
         mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
