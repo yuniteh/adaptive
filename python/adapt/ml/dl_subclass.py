@@ -7,7 +7,7 @@ import copy as cp
 import matplotlib.pyplot as plt
 
 class VAR(Model):
-    def __init__(self, latent_dim=16, c1=32, c2=32, name='var'):
+    def __init__(self, latent_dim=8, c1=32, c2=32, name='var'):
         super(VAR,self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()#renorm=True)
@@ -96,7 +96,7 @@ class DEC(Model):
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
-    def __init__(self, latent_dim=16, c1=32, c2=32,name='enc'):
+    def __init__(self, latent_dim=8, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()#renorm=True)
@@ -105,7 +105,7 @@ class CNNenc(Model):
         self.flatten = Flatten()
         self.dense1 = Dense(32, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn3 = BatchNormalization()#renorm=True)
-        self.latent = Dense(latent_dim, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn4 = BatchNormalization()#renorm=True)
 
     def call(self, x, train=False, bn_trainable=False):
