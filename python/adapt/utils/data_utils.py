@@ -542,3 +542,26 @@ def matAR(data,order):
         AR[i+2,:] = K[i+1,:]
 
     return AR[1:,:].T
+
+def update_mean(data,label,N=0,mu_class=None,std_class=None):
+    if not isinstance(data,np.ndarray):
+        data = data.numpy()
+    m = data.shape[1:]
+    u_class = np.unique(label)
+    n_class = u_class.shape[0]
+    ALPHA = np.zeros(N.shape)
+    N_new = np.zeros((n_class,))
+    if mu_class is None:
+        mu_class = np.zeros([n_class,m])
+        std_class = np.zeros([n_class,m])
+        N = np.zeros([n_class,])
+    
+    for i in range(0, n_class):
+        ind = np.squeeze(label == u_class[i])
+        N_new[i] = np.sum(ind)
+        ALPHA[i] = N[i] / (N[i] + N_new[i])
+        mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+        std_class[i,...] = ALPHA[i] * std_class[i,...] + (1 - ALPHA[i]) * np.std(data[ind,...],axis=0)
+        N[i] += N_new[i]
+
+    return mu_class, std_class, N
