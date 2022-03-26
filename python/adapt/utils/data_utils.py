@@ -73,15 +73,14 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     x_train, params = shuffle(x_train, params, random_state = 0)
     x_orig = cp.deepcopy(x_train)
     
-    # emg_scale = np.ones((x_train.shape[1],1))
+    emg_scale = np.ones((x_train.shape[1],1))
     if not isinstance(emg_scale,np.ndarray):
         emg_scale = np.ones((np.size(x_train,1),1))
         for i in range(np.size(x_train,1)):
             emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-    # print(num_classes)
-    # print(np.unique(params[:,0]))
+
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
     x_train_clean, y_train_clean = shuffle(x_train,y,random_state=0)
 
@@ -150,7 +149,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
 
     x_orig = cp.deepcopy(x)
-    # emg_scale = np.ones((x.shape[1],1))
+    emg_scale = np.ones((x.shape[1],1))
     if emg_scale is not None:
         x *= emg_scale
 
