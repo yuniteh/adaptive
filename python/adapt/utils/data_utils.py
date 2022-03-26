@@ -144,7 +144,6 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
         p_test_half = params[(params[:,1]%2!=0) & (params[:,2] !=1),...]
         params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_test_half))
 
-    print(num_classes)
     x, params = shuffle(x, params, random_state = 0)
     y = to_categorical(params[:,0]-1,num_classes=num_classes)
 

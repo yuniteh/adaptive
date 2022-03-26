@@ -307,26 +307,30 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 
     return acc
 
-def check_labels(test_data,test_params,train_dof,key):
+def check_labels(test_data,test_params,train_dof,key,test_key=True):
     # check classes trained vs tested
-    test_dof = np.unique(test_params[:,2])
+    test_dof = np.unique(test_params[:,-1])
 
     test_key = np.empty(test_dof.shape)
     for dof_i in range(len(test_dof)):
-        test_key[dof_i] = test_params[np.argmax(test_params[:,2] == test_dof[dof_i]),0]
+        test_key[dof_i] = test_params[np.argmax(test_params[:,-1] == test_dof[dof_i]),0]
 
-    if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
-        if len(test_dof) < len(train_dof):
-            print('Missing classes')
-            for key_i in key:
-                test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
-        overlap = ~np.in1d(test_dof, train_dof)
-        if overlap.any():
-            print('Removing ' + str(test_dof[overlap]))
-            for ov_i in range(np.sum(overlap)):
-                ind = test_params[:,2] == test_dof[overlap][ov_i]
-                test_params = test_params[~ind,...]
-                test_data = test_data[~ind,...]
+    if test_key:
+        if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
+            if len(test_dof) < len(train_dof):
+                print('Missing classes')
+                # for key_i in key:
+                #     test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
+            overlap = ~np.in1d(test_dof, train_dof)
+            if overlap.any():
+                print('Removing ' + str(test_dof[overlap]))
+                for ov_i in range(np.sum(overlap)):
+                    ind = test_params[:,2] == test_dof[overlap][ov_i]
+                    test_params = test_params[~ind,...]
+                    test_data = test_data[~ind,...]
+    
+    for key_i in key:
+        test_params[test_params[:,-1] == train_dof[int(key_i-1)],0] = key_i
     
     return test_data, test_params
 

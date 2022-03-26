@@ -77,7 +77,7 @@ def update_lda(data,label,N,mu_class,cov_class):
     N_new = np.zeros((n_class,))
     C = np.zeros([m,m])
     
-    for i in range(0, n_class):
+    for i in range(n_class):
         ind = np.squeeze(label == u_class[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
