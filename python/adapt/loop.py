@@ -307,7 +307,16 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 
     return acc
 
-def check_labels(test_data,test_params,train_dof,key,test_key=True):
+def check_train_labels(test_data,test_params,train_dof,key,test_key=True):
+    if not test_key:
+        for key_i in key:
+            test_params[test_params[:,-1] == train_dof[int(key_i)],0] = key_i
+    # else:
+
+    
+    return test_data, test_params
+
+def check_labels_old(test_data,test_params,train_dof,key,test_key=True):
     # check classes trained vs tested
     test_dof = np.unique(test_params[:,-1])
 
@@ -328,11 +337,12 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
                     ind = test_params[:,2] == test_dof[overlap][ov_i]
                     test_params = test_params[~ind,...]
                     test_data = test_data[~ind,...]
-    
+
     for key_i in key:
         test_params[test_params[:,-1] == train_dof[int(key_i-1)],0] = key_i
-    
+
     return test_data, test_params
+
 
 
         

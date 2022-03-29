@@ -80,13 +80,11 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
             emg_scale[i] = 5/np.max(np.abs(x_train[:,i,:]))
     x_train *= emg_scale
 
-
-    y = to_categorical(params[:,0]-1,num_classes=num_classes)
+    y = to_categorical(params[:,0],num_classes=num_classes)
     x_train_clean, y_train_clean = shuffle(x_train,y,random_state=0)
 
     if noise:
         x_train_noise, _, y_train_noise = add_noise_caps(x_train, params, num_classes=num_classes)
-            
         # shuffle data to make even batches
         x_train_noise, y_train_noise = shuffle(x_train_noise, y_train_noise, random_state = 0)
     else:
@@ -127,7 +125,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     x_train_clean_mlp = x_train_clean_cnn.reshape(x_train_clean_cnn.shape[0],-1)
 
     # LDA data
-    y_train_lda = params[:,[0]] - 1
+    y_train_lda = params[:,[0]]
     x_train_lda = extract_feats_caps(x_orig,ft=ft)
     # y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
     # x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
@@ -239,7 +237,7 @@ def add_noise_caps(raw, params,num_classes=None):
     
     out = np.concatenate((raw, out))
 
-    noisy, clean, y = out, orig, to_categorical(sub_params[:,0]-1,num_classes=num_classes)
+    noisy, clean, y = out, orig, to_categorical(sub_params[:,0],num_classes=num_classes)
 
     clean = clean[...,np.newaxis]
     noisy = noisy[...,np.newaxis]
