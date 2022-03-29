@@ -91,19 +91,6 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
         x_train_noise = cp.deepcopy(x_train_clean)
         y_train_noise = cp.deepcopy(y_train_clean)
 
-    # calculate class MAV
-    if prop_b:
-        mav_all, _, _, _, y_train_clean, ind = extract_scale(x_train_clean,load=False,ft='mav',caps=True)
-        mav_class = np.empty((y_train_clean.shape[1],x_train_clean.shape[1]))
-        for i in range(mav_class.shape[0]):
-            mav_class[i,:] = np.squeeze(np.mean(mav_all[y_train_clean[:,i].astype(bool),...],axis=0))
-        mav_tot = np.sum(np.square(mav_class), axis=1)[...,np.newaxis]
-        prop_temp = np.square((1 / mav_tot) * (mav_class @ np.squeeze(mav_all).T)).T
-        prop = np.zeros(prop_temp.shape)
-        prop[y_train_clean.astype(bool)] = prop_temp[y_train_clean.astype(bool)]        
-    else:
-        prop = np.empty((y_train_clean.shape))
-
     # Extract features
     if scaler is not None:
         load = True
@@ -130,7 +117,7 @@ def prep_train_caps(x_train, params, prop_b=True, num_classes=None, batch_size=1
     # y_train_lda = np.argmax(y_train_noise,axis=1)[...,np.newaxis]
     # x_train_lda = extract_feats_caps(x_train_noise,ft=ft)
 
-    return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max, prop
+    return x_train_clean_mlp, x_train_clean_cnn, y_train_clean, x_train_noise_mlp, x_train_noise_cnn, y_train_noise, x_train_lda, y_train_lda, emg_scale, scaler, x_min, x_max
 
 def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='feat', split=False):
     if split:
