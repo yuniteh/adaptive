@@ -130,7 +130,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
         params = np.vstack((p_rest[:p_rest.shape[0]//2,...],p_test_half))
 
     x, params = shuffle(x, params, random_state = 0)
-    y = to_categorical(params[:,0]-1,num_classes=num_classes)
+    y = to_categorical(params[:,0],num_classes=num_classes)
 
     x_orig = cp.deepcopy(x)
     emg_scale = np.ones((x.shape[1],1))
@@ -153,7 +153,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
         x_test_mlp = 0
 
     # LDA data
-    y_lda = params[:,[0]] - 1
+    y_lda = params[:,[0]]
     x_lda = extract_feats_caps(x_orig,ft=ft)
     # y_lda = np.argmax(y_train_noise,axis=1)
     # x_lda = extract_feats_caps(x_train_noise,ft=ft)

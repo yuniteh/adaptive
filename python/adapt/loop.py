@@ -307,13 +307,28 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 
     return acc
 
-def check_train_labels(test_data,test_params,train_dof,key,test_key=True):
-    if not test_key:
-        for key_i in key:
-            test_params[test_params[:,-1] == train_dof[int(key_i)],0] = key_i
-    # else:
+def check_labels(test_data,test_params,train_dof,key,test_key=True):
 
+    # for key_i in key:
+    #     test_params[test_params[:,-1]==train_dof[int(key_i)],0] = key_i
+    for dof in train_dof:
+        test_params[test_params[:,-1]==dof,0] = key[train_dof==dof]
+
+    if test_key:
+        test_dof = np.unique(test_params[:,-1])
+        print('init test dof: ' + str(test_dof))
+        xtra_dof = ~np.isin(test_dof,train_dof)
+        for dof in test_dof[xtra_dof]:
+            print('removing extra test DOF' + str(dof))
+            ind = test_params[:,-1] == dof
+            test_params = test_params[~ind,...]
+            test_data = test_data[~ind,...]
+        key2 = np.zeros(train_dof.shape)
+        for dof in train_dof:
+            key2[train_dof==dof] = np.mean(test_params[test_params[:,-1] == dof,0])
     
+        print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
+
     return test_data, test_params
 
 def check_labels_old(test_data,test_params,train_dof,key,test_key=True):

@@ -35,7 +35,7 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
         N = np.zeros((n_class))
         cov_class = []
 
-        for i in range(0,n_class):
+        for i in range(n_class):
             ind = label == u_class[i]
             N[i] = np.sum(np.squeeze(ind))
             mu_class[i,:] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
