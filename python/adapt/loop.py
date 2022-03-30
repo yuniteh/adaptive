@@ -323,9 +323,10 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
             ind = test_params[:,-1] == dof
             test_params = test_params[~ind,...]
             test_data = test_data[~ind,...]
+        test_dof = np.delete(test_dof)
         key2 = np.zeros(train_dof.shape)
         for dof in train_dof:
-            key2[train_dof==dof] = np.mean(test_params[test_params[:,-1] == dof,0])
+            key2[train_dof==dof] = np.nanmean(test_params[test_params[:,-1] == dof,0])
     
         print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
 
