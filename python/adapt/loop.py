@@ -323,10 +323,13 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
             ind = test_params[:,-1] == dof
             test_params = test_params[~ind,...]
             test_data = test_data[~ind,...]
-        test_dof = np.delete(test_dof)
+        test_dof = np.delete(test_dof,xtra_dof)
         key2 = np.zeros(train_dof.shape)
+        key2[:] = np.nan
         for dof in train_dof:
-            key2[train_dof==dof] = np.nanmean(test_params[test_params[:,-1] == dof,0])
+            ind = test_params[:,-1] == dof
+            if np.sum(ind) > 0:
+                key2[train_dof==dof] = np.nanmean(test_params[ind,0])
     
         print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
 
