@@ -319,7 +319,7 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
         print('init test dof: ' + str(test_dof))
         xtra_dof = ~np.isin(test_dof,train_dof)
         for dof in test_dof[xtra_dof]:
-            print('removing extra test DOF' + str(dof))
+            print('removing extra test DOF ' + str(dof))
             ind = test_params[:,-1] == dof
             test_params = test_params[~ind,...]
             test_data = test_data[~ind,...]
