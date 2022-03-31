@@ -201,28 +201,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             elif model == 'cnn': # calibrating CNN
                 model = CNN(n_class=n_dof, adapt=adapt)
                 trainable = True
-            elif model == 'vcnn':
-                model = VCNN(n_class=n_dof)
-                model(traincnn[:1,...])
-                model.add_dec(traincnn[:1,...])
-                model(traincnn[:2,...],np.ones((2,)),dec=True)
-                if dec:
-                    model.clf.trainable = False
-                    model.enc.trainable = True
-                    model.dec.trainable = True
-                else:
-                    model.clf.trainable = True
-                    model.enc.trainable = True
-                    model.dec.trainable = False
-            elif isinstance(model,VCNN):
-                if dec:
-                    model.clf.trainable = False
-                    model.enc.trainable = True
-                    model.dec.trainable = True
-                else:
-                    model.clf.trainable = True
-                    model.enc.trainable = True
-                    model.dec.trainable = False
                     
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
