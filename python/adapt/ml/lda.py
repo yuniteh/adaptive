@@ -110,9 +110,11 @@ def update_lda(data,label,N,mu_class,cov_class,key,prev_key):
             N[i] += N_new[i]
     
     new_class = ~np.isin(key,prev_key, assume_unique=True)
-    for i in key[new_class]:
+    for k in key[new_class]:
         print('new class alda')
-        ind = np.squeeze(label == i)
+        ind = np.squeeze(label == k)
+        i = np.squeeze(key==k)
+        print(i)
         N_new[i] = np.sum(ind)
         mu_class[i,...] = np.mean(data[ind,:],axis=0,keepdims=True)
         cov_class[i,...] = np.cov(data[ind,:].T)
@@ -129,8 +131,9 @@ def update_lda(data,label,N,mu_class,cov_class,key,prev_key):
     c = np.zeros([n_class, 1])
 
     for i in range(n_class):
-        w[i,:] = np.dot(mu_class[np.newaxis,i,:],np.linalg.pinv(C))
-        c[i,:] = np.dot(-.5 * np.dot(mu_class[np.newaxis,i,:], np.linalg.pinv(C)),mu_class[np.newaxis,i,:].T) + np.log(prior)    
+        k = np.squeeze(key==i)
+        w[i,:] = np.dot(mu_class[k,:],np.linalg.pinv(C))
+        c[i,:] = np.dot(-.5 * np.dot(mu_class[k,:], np.linalg.pinv(C)),mu_class[k,:].T) + np.log(prior)    
 
     return w, c, mu_class, cov_class, N
 
