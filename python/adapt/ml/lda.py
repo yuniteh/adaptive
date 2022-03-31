@@ -35,7 +35,7 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
         N = np.zeros((n_class))
         cov_class = []
 
-        for i in range(0,n_class):
+        for i in range(n_class):
             ind = label == u_class[i]
             N[i] = np.sum(np.squeeze(ind))
             mu_class[i,:] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
@@ -67,7 +67,7 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
         return w, c
 
 # train LDA classifier for data: (samples,feat), label: (samples, 1)
-def update_lda(data,label,N,mu_class,cov_class):
+def update_lda(data,label,N,mu_class,cov_class,key,prev_key):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = data.shape[1]
@@ -75,10 +75,17 @@ def update_lda(data,label,N,mu_class,cov_class):
     n_class = u_class.shape[0]
     ALPHA = np.zeros(N.shape)
     N_new = np.zeros((n_class,))
+    N_new = np.zeros((len(key,)))
+    N_fixed = np.zeros((len(key,)))
+    N_fixed[:len(prev_key)] = N
+    N = N_fixed
+    mu_fixed = np.zeros((len(key),m))
+    mu_fixed[:len(prev_key),:] = mu_class
+    mu_class = mu_fixed
     C = np.zeros([m,m])
     
-    for i in range(0, n_class):
-        ind = np.squeeze(label == u_class[i])
+    for i in range(len(prev_key)):
+        ind = np.squeeze(label == prev_key[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
         zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
@@ -89,7 +96,16 @@ def update_lda(data,label,N,mu_class,cov_class):
         C += cov_class[i]
 
         N[i] += N_new[i]
-
+    
+    new_class = np.isin(key,prev_key, assume_unique=True)
+    for i in key[new_class].astype(int):
+        ind = label == i
+        N_new[i] = np.sum(ind)
+        mu_class[i,...] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
+        cov_class.append(np.cov(data[ind[:,0],:].T))
+        C += cov_class[i]
+        N[i] += N_new[i]
+        
     C /= n_class
     prior = 1/n_class
 

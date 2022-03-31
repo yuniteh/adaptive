@@ -17,7 +17,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
 
     if plot_loss:
-        _, ax = plt.subplots(len(lams),2,squeeze=False,figsize=(12,len(lams)*3.5))
+        _, ax = plt.subplots(len(lams),3,squeeze=False,figsize=(18,len(lams)*3.5))
     
     loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
     f_loss = np.zeros((int(num_iter/disp_freq)+1,len(lams)))
@@ -39,11 +39,11 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             test_accs.append(np.zeros(int(num_iter/disp_freq)+1))
         
         if lams[l] == 0:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         else:
-            # optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=0.000001)#,clipvalue=.5)
         
         # train functions
         train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -76,7 +76,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
             #     lam_in = 1
             if lams[l] > 0:
                 if iter < 5:
-                    lam_in = lam_array[iter]
+                    # lam_in = lam_array[iter]
                     lam_in = lams[l]
                 else:
                     lam_in = lams[l]
@@ -117,7 +117,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
                 break
             
             if lams[l] > 0:
-                if np.abs(train_diff) < 1e-2 and fish_diff < 0:
+                if np.abs(train_diff) < 1e-3 and fish_diff < 0:
                     print('early stop')
                     break
             else:
@@ -160,23 +160,23 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
         if plot_loss:
             ax[l,0].plot(range(0,iter+2,disp_freq), loss[:iter+2,l], 'r-', label="class loss")
             if np.sum(f_loss[:,l]) > 0:
-                ax[l,0].plot(range(0,iter+2,disp_freq), f_loss[:iter+2,l], 'b-', label="fish loss")
-            ax[l,0].legend(loc="center right")
-            ax[l,0].set_ylabel("Loss")
+                ax[l,1].plot(range(0,iter+2,disp_freq), f_loss[:iter+2,l], 'b-', label="fish loss")
+            ax[l,1].legend(loc="center right")
+            ax[l,1].set_ylabel("Loss")
 
             for task in range(len(x_test)):
                 col = chr(ord('A') + task)
-                ax[l,1].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + col)
-            ax[l,1].legend(loc="center right")
-            ax[l,1].set_ylabel("Valid Accuracy")
-            ax[l,1].set_ylim((0,1.1))
+                ax[l,2].plot(range(0,iter+2,disp_freq), test_accs[task][:iter+2], colors[task], label="task " + col)
+            ax[l,2].legend(loc="center right")
+            ax[l,2].set_ylabel("Valid Accuracy")
+            ax[l,2].set_ylim((0,1.1))
 
             if lams[l] == 0:
                 ax[l,0].set_title('Vanilla MLP')
             else:
                 ax[l,0].set_title('EWC (λ: ' + str(lams[l]) + ')')
 
-            for i in range(2):
+            for i in range(3):
                 if l == len(lams)-1:
                     ax[l,i].set_xlabel("Iterations")
                 ax[l,i].set_xlim([0,iter+2])
@@ -208,28 +208,28 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 model(traincnn[:2,...],np.ones((2,)),dec=True)
                 if dec:
                     model.clf.trainable = False
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = True
                 else:
                     model.clf.trainable = True
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = False
             elif isinstance(model,VCNN):
                 if dec:
                     model.clf.trainable = False
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = True
                 else:
                     model.clf.trainable = True
-                    model.var.trainable = True
+                    model.enc.trainable = True
                     model.dec.trainable = False
                     
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
                 model = model[0]
 
-            optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-            # optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            # optimizer = tf.keras.optimizers.SGD(learning_rate=.0001)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')
             kl_loss = tf.keras.metrics.Mean(name='kl_loss')
@@ -249,9 +249,9 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 
                 if ep > 20:
                     if epoch > 15:
-                        lam_in = [1,2]
+                        lam_in = [10,0]
                     else:
-                        lam_in = [1,2]
+                        lam_in = [10,0]
                 else:
                     lam_in = [100,10]
 
@@ -307,27 +307,61 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 
     return acc
 
-def check_labels(test_data,test_params,train_dof,key):
+def check_labels(test_data,test_params,train_dof,key,test_key=True):
+
+    # for key_i in key:
+    #     test_params[test_params[:,-1]==train_dof[int(key_i)],0] = key_i
+    for dof in train_dof:
+        test_params[test_params[:,-1]==dof,0] = key[train_dof==dof]
+
+    if test_key:
+        test_dof = np.unique(test_params[:,-1])
+        print('init test dof: ' + str(test_dof))
+        xtra_dof = ~np.isin(test_dof,train_dof)
+        for dof in test_dof[xtra_dof]:
+            print('removing extra test DOF ' + str(dof))
+            ind = test_params[:,-1] == dof
+            test_params = test_params[~ind,...]
+            test_data = test_data[~ind,...]
+        test_dof = np.delete(test_dof,xtra_dof)
+        key2 = np.zeros(train_dof.shape)
+        key2[:] = np.nan
+        for dof in train_dof:
+            ind = test_params[:,-1] == dof
+            if np.sum(ind) > 0:
+                key2[train_dof==dof] = np.nanmean(test_params[ind,0])
+    
+        print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
+
+    return test_data, test_params
+
+def check_labels_old(test_data,test_params,train_dof,key,test_key=True):
     # check classes trained vs tested
-    test_dof = np.unique(test_params[:,2])
+    test_dof = np.unique(test_params[:,-1])
+
     test_key = np.empty(test_dof.shape)
     for dof_i in range(len(test_dof)):
-        test_key[dof_i] = test_params[np.argmax(test_params[:,2] == test_dof[dof_i]),0]
+        test_key[dof_i] = test_params[np.argmax(test_params[:,-1] == test_dof[dof_i]),0]
 
-    if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
-        if len(test_dof) < len(train_dof):
-            print('Missing classes')
-            for key_i in key:
-                test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
-        overlap = ~np.in1d(test_dof, train_dof)
-        if overlap.any():
-            print('Removing ' + str(test_dof[overlap]))
-            for ov_i in range(np.sum(overlap)):
-                ind = test_params[:,2] == test_dof[overlap][ov_i]
-                test_params = test_params[~ind,...]
-                test_data = test_data[~ind,...]
-    
+    if test_key:
+        if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
+            if len(test_dof) < len(train_dof):
+                print('Missing classes')
+                # for key_i in key:
+                #     test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
+            overlap = ~np.in1d(test_dof, train_dof)
+            if overlap.any():
+                print('Removing ' + str(test_dof[overlap]))
+                for ov_i in range(np.sum(overlap)):
+                    ind = test_params[:,2] == test_dof[overlap][ov_i]
+                    test_params = test_params[~ind,...]
+                    test_data = test_data[~ind,...]
+
+    for key_i in key:
+        test_params[test_params[:,-1] == train_dof[int(key_i-1)],0] = key_i
+
     return test_data, test_params
+
 
 
         
