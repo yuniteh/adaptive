@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import eig, inv
 import tensorflow as tf
-
+import copy as cp
 
 # train and predict for data: (samples,feat), label: (samples, 1)
 def eval_lda(w, c, x_test, y_test, clean_size=None):
@@ -73,37 +73,47 @@ def update_lda(data,label,N,mu_class,cov_class,key,prev_key):
     m = data.shape[1]
     u_class = np.unique(label)
     n_class = u_class.shape[0]
-    ALPHA = np.zeros(N.shape)
-    N_new = np.zeros((n_class,))
+    key = key.astype(int)
+    prev_key = prev_key.astype(int)
+
     N_new = np.zeros((len(key,)))
     N_fixed = np.zeros((len(key,)))
-    N_fixed[:len(prev_key)] = N
-    N = N_fixed
     mu_fixed = np.zeros((len(key),m))
-    mu_fixed[:len(prev_key),:] = mu_class
-    mu_class = mu_fixed
+    cov_class = np.array(cov_class)
+    cov_fixed = np.zeros((len(key),cov_class.shape[1],cov_class.shape[2]))
+    for k in prev_key:
+        N_fixed[key == k] = N[prev_key == k]
+        mu_fixed[key == k,...] = mu_class[prev_key==k,...]
+        cov_fixed[key == k,...] = cov_class[prev_key==k,...]
+    N = cp.deepcopy(N_fixed)
+    mu_class = cp.deepcopy(mu_fixed)
+    cov_class = cp.deepcopy(cov_fixed)
+    ALPHA = np.zeros(N.shape)
+    n_class = len(key)
     C = np.zeros([m,m])
     
-    for i in range(len(prev_key)):
-        ind = np.squeeze(label == prev_key[i])
+    # for i in range(len(prev_key)):
+    for k in prev_key:
+        ind = np.squeeze(label == k)
+        i = np.squeeze(key == k)
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
         zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
         mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
         zero_mean_feats_new = data[ind,...] - mu_class[i,...]                                # De-mean based on the updated mean value
         point_cov = np.dot(zero_mean_feats_old.T, zero_mean_feats_new)
-        cov_class[i] = ALPHA[i] * cov_class[i] + (1 - ALPHA[i]) * point_cov                      # Update the covariance
-        C += cov_class[i]
+        cov_class[i,...] = ALPHA[i] * cov_class[i,...] + (1 - ALPHA[i]) * point_cov                      # Update the covariance
+        C += np.squeeze(cov_class[i,...])
 
         N[i] += N_new[i]
     
     new_class = np.isin(key,prev_key, assume_unique=True)
-    for i in key[new_class].astype(int):
-        ind = label == i
+    for i in key[new_class]:
+        ind = np.squeeze(label == i)
         N_new[i] = np.sum(ind)
-        mu_class[i,...] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
-        cov_class.append(np.cov(data[ind[:,0],:].T))
-        C += cov_class[i]
+        mu_class[i,...] = np.mean(data[ind,:],axis=0,keepdims=True)
+        cov_class[i,...] = np.cov(data[ind,:].T)
+        C += np.squeeze(cov_class[i,...])
         N[i] += N_new[i]
         
     C /= n_class
