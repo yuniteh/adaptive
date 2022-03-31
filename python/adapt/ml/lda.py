@@ -16,7 +16,7 @@ def eval_lda(w, c, x_test, y_test, clean_size=None):
         out = predict(x_test, w, c)
         acc = np.sum(out.reshape(y_test.shape) == y_test)/y_test.shape[0]
         
-        return acc,out
+        return acc
 
 # train LDA classifier for data: (samples,feat), label: (samples, 1)
 def train_lda(data,label, key, mu_bool=False, mu_class = 0, C = 0):

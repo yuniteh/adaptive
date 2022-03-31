@@ -526,7 +526,7 @@ def matAR(data,order):
 
     return AR[1:,:].T
 
-def update_mean(data,label,key,prev_key, N=0,mu_class=None,std_class=None):
+def update_mean(data,label, N=0,mu_class=None,std_class=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = list(data.shape[1:])
@@ -549,51 +549,52 @@ def update_mean(data,label,key,prev_key, N=0,mu_class=None,std_class=None):
         std_class[i,...] = ALPHA[i] * std_class[i,...] + (1 - ALPHA[i]) * np.std(data[ind,...],axis=0)
         N[i] += N_new[i]
 
-    key = key.astype(int)
-    prev_key = prev_key.astype(int)
+    # key = key.astype(int)
+    # prev_key = prev_key.astype(int)
 
-    N_new = np.zeros((len(key,)))
-    N_fixed = np.zeros((len(key,)))
-    mu_fixed = np.zeros((len(key),m))
-    cov_fixed = np.zeros((len(key),cov_class.shape[1],cov_class.shape[2]))
+    # m.insert(0,len(key))
+    # N_new = np.zeros((len(key,)))
+    # N_fixed = np.zeros((len(key,)))
+    # mu_fixed = np.zeros(m)
+    # cov_fixed = np.zeros(m)
 
-    for k in prev_key:
-        N_fixed[key == k] = N[prev_key == k]
-        mu_fixed[key == k,...] = mu_class[prev_key==k,...]
-        cov_fixed[key == k,...] = cov_class[prev_key==k,...]
-    N = cp.deepcopy(N_fixed)
-    mu_class = cp.deepcopy(mu_fixed)
-    cov_class = cp.deepcopy(cov_fixed)
-    ALPHA = np.zeros(N.shape)
-    n_class = len(key)
-    C = np.zeros([m,m])
+    # for k in prev_key:
+    #     N_fixed[key == k] = N[prev_key == k]
+    #     mu_fixed[key == k,...] = mu_class[prev_key==k,...]
+    #     cov_fixed[key == k,...] = cov_class[prev_key==k,...]
+    # N = cp.deepcopy(N_fixed)
+    # mu_class = cp.deepcopy(mu_fixed)
+    # cov_class = cp.deepcopy(cov_fixed)
+    # ALPHA = np.zeros(N.shape)
+    # n_class = len(key)
+    # C = np.zeros([m,m])
     
-    # for i in range(len(prev_key)):
-    old_class = np.isin(key,prev_key,assume_unique=True)
-    for k in key[old_class]:
-        ind = np.squeeze(label == k)
-        i = np.squeeze(key == k)
-        N_new[i] = np.sum(ind)
-        if N_new[i] > 0:
-            ALPHA[i] = N[i] / (N[i] + N_new[i])
-            zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
-            mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
-            zero_mean_feats_new = data[ind,...] - mu_class[i,...]                                # De-mean based on the updated mean value
-            point_cov = np.dot(zero_mean_feats_old.T, zero_mean_feats_new)
-            cov_class[i,...] = ALPHA[i] * cov_class[i,...] + (1 - ALPHA[i]) * point_cov                      # Update the covariance
-            # C += np.squeeze(cov_class[i,...])
-            N[i] += N_new[i]
+    # # for i in range(len(prev_key)):
+    # old_class = np.isin(key,prev_key,assume_unique=True)
+    # for k in key[old_class]:
+    #     ind = np.squeeze(label == k)
+    #     i = np.squeeze(key == k)
+    #     N_new[i] = np.sum(ind)
+    #     if N_new[i] > 0:
+    #         ALPHA[i] = N[i] / (N[i] + N_new[i])
+    #         zero_mean_feats_old = data[ind,...] - mu_class[i,...]                                    # De-mean based on old mean value
+    #         mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+    #         zero_mean_feats_new = data[ind,...] - mu_class[i,...]                                # De-mean based on the updated mean value
+    #         point_cov = np.dot(zero_mean_feats_old.T, zero_mean_feats_new)
+    #         cov_class[i,...] = ALPHA[i] * cov_class[i,...] + (1 - ALPHA[i]) * point_cov                      # Update the covariance
+    #         # C += np.squeeze(cov_class[i,...])
+    #         N[i] += N_new[i]
     
-    new_class = ~np.isin(key,prev_key, assume_unique=True)
-    for k in key[new_class]:
-        print('new class alda')
-        ind = np.squeeze(label == k)
-        i = np.squeeze(key==k)
-        print(i)
-        N_new[i] = np.sum(ind)
-        mu_class[i,...] = np.mean(data[ind,:],axis=0,keepdims=True)
-        cov_class[i,...] = np.cov(data[ind,:].T)
+    # new_class = ~np.isin(key,prev_key, assume_unique=True)
+    # for k in key[new_class]:
+    #     print('new class alda')
+    #     ind = np.squeeze(label == k)
+    #     i = np.squeeze(key==k)
+    #     print(i)
+    #     N_new[i] = np.sum(ind)
+    #     mu_class[i,...] = np.mean(data[ind,:],axis=0,keepdims=True)
+    #     cov_class[i,...] = np.cov(data[ind,:].T)
         
-        N[i] += N_new[i]
+    #     N[i] += N_new[i]
 
     return mu_class, std_class, N
