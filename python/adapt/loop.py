@@ -201,28 +201,6 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             elif model == 'cnn': # calibrating CNN
                 model = CNN(n_class=n_dof, adapt=adapt)
                 trainable = True
-            elif model == 'vcnn':
-                model = VCNN(n_class=n_dof)
-                model(traincnn[:1,...])
-                model.add_dec(traincnn[:1,...])
-                model(traincnn[:2,...],np.ones((2,)),dec=True)
-                if dec:
-                    model.clf.trainable = False
-                    model.enc.trainable = True
-                    model.dec.trainable = True
-                else:
-                    model.clf.trainable = True
-                    model.enc.trainable = True
-                    model.dec.trainable = False
-            elif isinstance(model,VCNN):
-                if dec:
-                    model.clf.trainable = False
-                    model.enc.trainable = True
-                    model.dec.trainable = True
-                else:
-                    model.clf.trainable = True
-                    model.enc.trainable = True
-                    model.dec.trainable = False
                     
             elif isinstance(model,list): # calibrating CNN-LDA
                 w_c = model[1:3]
@@ -256,10 +234,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                     lam_in = [100,10]
 
                 for x, y, _ in ds:
-                    if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, trainable=trainable, lam=lam_in, dec=dec)
-                    else:
-                        train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
                 if print_b:
                     # if epoch == 0 or epoch == ep-1:
@@ -309,8 +284,6 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
 
 def check_labels(test_data,test_params,train_dof,key,test_key=True):
 
-    # for key_i in key:
-    #     test_params[test_params[:,-1]==train_dof[int(key_i)],0] = key_i
     for dof in train_dof:
         test_params[test_params[:,-1]==dof,0] = key[train_dof==dof]
 
@@ -332,33 +305,6 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
                 key2[train_dof==dof] = np.nanmean(test_params[ind,0])
     
         print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
-
-    return test_data, test_params
-
-def check_labels_old(test_data,test_params,train_dof,key,test_key=True):
-    # check classes trained vs tested
-    test_dof = np.unique(test_params[:,-1])
-
-    test_key = np.empty(test_dof.shape)
-    for dof_i in range(len(test_dof)):
-        test_key[dof_i] = test_params[np.argmax(test_params[:,-1] == test_dof[dof_i]),0]
-
-    if test_key:
-        if not(np.all(np.in1d(test_dof,train_dof)) and np.all(np.in1d(train_dof,test_dof))):
-            if len(test_dof) < len(train_dof):
-                print('Missing classes')
-                # for key_i in key:
-                #     test_params[test_params[:,2] == train_dof[int(key_i-1)],0] = key_i
-            overlap = ~np.in1d(test_dof, train_dof)
-            if overlap.any():
-                print('Removing ' + str(test_dof[overlap]))
-                for ov_i in range(np.sum(overlap)):
-                    ind = test_params[:,2] == test_dof[overlap][ov_i]
-                    test_params = test_params[~ind,...]
-                    test_data = test_data[~ind,...]
-
-    for key_i in key:
-        test_params[test_params[:,-1] == train_dof[int(key_i-1)],0] = key_i
 
     return test_data, test_params
 
