@@ -264,7 +264,9 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
     if lda is not None:
         w = lda[0]
         c = lda[1]
-        acc[0] = eval_lda(w, c, x_lda, y_lda) * 100
+        # acc[0],out = eval_lda(w, c, x_lda, y_lda) * 100
+        temp,out = eval_lda(w, c, x_lda, y_lda)
+        acc[0] = temp*100
     
     # test CNN
     if cnn is not None:
@@ -280,7 +282,7 @@ def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None,
             c = clda[1]
             acc[1] = eval_lda(w, c, cnn.enc(x_test_cnn).numpy(), np.argmax(y_test,axis=1)[...,np.newaxis]) * 100
 
-    return acc
+    return acc,out
 
 def check_labels(test_data,test_params,train_dof,key,test_key=True):
 
