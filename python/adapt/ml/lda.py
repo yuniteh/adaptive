@@ -19,12 +19,13 @@ def eval_lda(w, c, x_test, y_test, clean_size=None):
         return acc,out
 
 # train LDA classifier for data: (samples,feat), label: (samples, 1)
-def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
+def train_lda(data,label, key, mu_bool=False, mu_class = 0, C = 0):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = data.shape[1]
     u_class = np.unique(label)
     n_class = u_class.shape[0]
+    n_class = len(key)
 
     if not mu_bool:
         mu = np.mean(data,axis=0,keepdims = True)
@@ -33,19 +34,21 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
         Sb = np.zeros([mu.shape[1],mu.shape[1]])
         Sw = np.zeros([mu.shape[1],mu.shape[1]])
         N = np.zeros((n_class))
-        cov_class = []
+        cov_class = np.zeros([n_class,m,m])
 
-        for i in range(n_class):
-            ind = label == u_class[i]
+        for k in key:
+            ind = np.squeeze(label == k)
+            i = np.squeeze(key==k)
+            # ind = label == u_class[i]
             N[i] = np.sum(np.squeeze(ind))
-            mu_class[i,:] = np.mean(data[ind[:,0],:],axis=0,keepdims=True)
-            cov_class.append(np.cov(data[ind[:,0],:].T))
-            C += cov_class[i]
-            Sb += ind.shape[0] * np.dot((mu_class[np.newaxis,i,:] - mu).T,(mu_class[np.newaxis,i,:] - mu)) 
+            mu_class[i,:] = np.mean(data[ind,:],axis=0,keepdims=True)
+            cov_class[i,...] = np.cov(data[ind,:].T)
+            C += np.squeeze(cov_class[i,...])
+            Sb += ind.shape[0] * np.dot((mu_class[i,:] - mu).T,(mu_class[i,:] - mu)) 
 
             Sw_temp = np.zeros([mu.shape[1],mu.shape[1]])
-            for row in data[ind[:,0],:]:
-                Sw_temp += np.dot((row[:,np.newaxis] - mu_class[i,:,np.newaxis]), (row[:,np.newaxis] - mu_class[i,:,np.newaxis]).T)
+            for row in data[ind,:]:
+                Sw_temp += np.dot((row[:,np.newaxis] - mu_class[i,:]), (row[:,np.newaxis] - mu_class[i,:]).T)
             Sw += Sw_temp
         C /= n_class
         u,v = eig(inv(Sw).dot(Sb))    
@@ -57,9 +60,10 @@ def train_lda(data,label, mu_bool=False, mu_class = 0, C = 0):
     w = np.zeros([n_class, m])
     c = np.zeros([n_class, 1])
 
-    for i in range(0, n_class):
-        w[i,:] = np.dot(mu_class[np.newaxis,i,:],np.linalg.pinv(C))
-        c[i,:] = np.dot(-.5 * np.dot(mu_class[np.newaxis,i,:], np.linalg.pinv(C)),mu_class[np.newaxis,i,:].T) + np.log(prior)    
+    for i in range(n_class):
+        k = np.squeeze(key==i)
+        w[i,:] = np.dot(mu_class[k,:],np.linalg.pinv(C))
+        c[i,:] = np.dot(-.5 * np.dot(mu_class[k,:], np.linalg.pinv(C)),mu_class[k,:].T) + np.log(prior)    
 
     if not mu_bool:
         return w, c, mu_class, C, v, N, cov_class
@@ -79,7 +83,6 @@ def update_lda(data,label,N,mu_class,cov_class,key,prev_key):
     N_new = np.zeros((len(key,)))
     N_fixed = np.zeros((len(key,)))
     mu_fixed = np.zeros((len(key),m))
-    cov_class = np.array(cov_class)
     cov_fixed = np.zeros((len(key),cov_class.shape[1],cov_class.shape[2]))
 
     for k in prev_key:
