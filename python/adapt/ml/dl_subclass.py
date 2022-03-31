@@ -96,32 +96,32 @@ class DEC(Model):
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 class CNNenc(Model):
-    def __init__(self, latent_dim=8, c1=32, c2=32,name='enc'):
+    def __init__(self, latent_dim=12, c1=32, c2=32,name='enc'):
         super(CNNenc, self).__init__(name=name)
         self.conv1 = Conv2D(c1,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()#renorm=True)
         self.conv2 = Conv2D(c2,3, activation='relu', strides=1, padding="same", activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()#renorm=True)
-        self.flatten = Flatten()
+        self.flatten = Flatten(dtype="float32")
         self.dense1 = Dense(32, activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn3 = BatchNormalization()#renorm=True)
         self.latent = Dense(latent_dim, activity_regularizer=tf.keras.regularizers.l1(10e-5))
-        self.bn4 = BatchNormalization()#renorm=True)
+        self.bn4 = BatchNormalization(dtype="float32")
 
-    def call(self, x, train=False, bn_trainable=False):
+    def call(self, x, bn_training=False, bn_trainable=False):
         self.bn1.trainable = bn_trainable
         self.bn2.trainable = bn_trainable
         self.bn3.trainable = bn_trainable
         self.bn4.trainable = bn_trainable
         x = self.conv1(x)
-        x = self.bn1(x, training=train)
+        x = self.bn1(x, training=bn_training)
         x = self.conv2(x)
-        x = self.bn2(x, training=train)
+        x = self.bn2(x, training=bn_training)
         x = self.flatten(x)
         x = self.dense1(x)
-        x = self.bn3(x, training=train)
+        x = self.bn3(x, training=bn_training)
         x = self.latent(x)
-        x = self.bn4(x, training=train)
+        x = self.bn4(x, training=bn_training)
         return x
 
 class CNNbase(Model):
@@ -183,7 +183,7 @@ class VCLF(Model):
 class CLF(Model):
     def __init__(self, n_class=7, act='softmax', name='clf'):
         super(CLF, self).__init__(name=name)
-        self.dense1 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.dense1 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
     def call(self, x):
         return self.dense1(x)

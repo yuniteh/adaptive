@@ -234,10 +234,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                     lam_in = [100,10]
 
                 for x, y, _ in ds:
-                    if isinstance(model,VCNN):
-                        train_mod(x, y, model, optimizer, train_loss, sec_loss, kl_loss, train_accuracy, trainable=trainable, lam=lam_in, dec=dec)
-                    else:
-                        train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, trainable=trainable, adapt=adapt)
 
                 if print_b:
                     # if epoch == 0 or epoch == ep-1:
