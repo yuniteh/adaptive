@@ -16,8 +16,8 @@ class VAR(Model):
         self.flatten = Flatten(dtype="float32")
     
     def call(self, x, bn_training=False, bn_trainable=False):
-        self.bn1.trainable=bn_trainable
-        self.bn2.trainable=bn_trainable
+        self.bn1.trainable=True
+        self.bn2.trainable=True
         x = self.conv1(x)
         x = self.bn1(x,training=bn_training)
         x = self.conv2(x)
@@ -170,9 +170,9 @@ class VCLF(Model):
         self.bn2 = BatchNormalization()
         self.dense2 = Dense(n_class, activation=act, activity_regularizer=tf.keras.regularizers.l1(10e-5),dtype="float32")
 
-    def call(self, x, bn_training=False, bn_trainable=False):
-        self.bn1.trainable = bn_trainable
-        self.bn2.trainable = bn_trainable
+    def call(self, x, bn_training=False, bn_trainable=False, prog_train=False):
+        self.bn1.trainable = True
+        self.bn2.trainable = True
         x = self.dense1(x)
         x = self.bn1(x,training = bn_training)
         x = self.latent(x)
@@ -220,13 +220,13 @@ class CNN(Model):
         # self.clf = CLF(n_class)
         self.clf = VCLF(n_class)
     
-    def call(self, x, bn_training=False, bn_trainable=False):
+    def call(self, x, bn_training=False, bn_trainable=False, prog_train=False):
         if hasattr(self,'top'):
             x = self.top(x, bn_training=bn_training, bn_trainable=bn_trainable)
             x = self.base(x, bn_training=bn_training, bn_trainable=bn_trainable)
         else:
             x = self.enc(x, bn_training=bn_training, bn_trainable=bn_trainable)
-        y = self.clf(x)
+        y = self.clf(x,bn_training=bn_training, bn_trainable=bn_trainable,prog_train=prog_train)
         return y
 
 class EWC(Model):
@@ -348,7 +348,7 @@ def get_fish():
 
 def get_train():
     @tf.function
-    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, lam=0, clda=None, trainable=True, dec=False):
+    def train_step(x, y, mod, optimizer, train_loss=None, sec_loss=None, third_loss=None, train_accuracy=None, adapt=False, lam=0, clda=None, trainable=True, dec=False, prog_train=True):
         with tf.GradientTape() as tape:
             if isinstance(mod,VCNN):
                 mod_out = mod(x, y=tf.argmax(y,axis=-1), training=True, bn_training=True, bn_trainable=trainable, dec=dec)
@@ -363,13 +363,13 @@ def get_train():
                     loss = rec_loss*lam[0] + kl_loss*lam[1]
             else:
                 if adapt:
-                    y_out = mod(x,training=True, bn_training=True, bn_trainable=trainable)
+                    y_out = mod(x,training=True, bn_training=True, bn_trainable=trainable, prog_train=True)
                 else:
                     if clda is not None:
                         mod.clf.trainable = False
                         y_out = tf.nn.softmax(tf.transpose(tf.matmul(tf.cast(clda[0],tf.float32),tf.transpose(mod.enc(x,training=True))) + tf.cast(clda[1],tf.float32)))
                     else:
-                        y_out = mod(x,training=True,bn_training=True,bn_trainable=trainable)
+                        y_out = mod(x,training=trainable,bn_training=trainable,bn_trainable=trainable)
                 
                 loss = tf.keras.losses.categorical_crossentropy(y,y_out)
 
