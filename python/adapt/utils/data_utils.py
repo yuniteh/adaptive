@@ -598,3 +598,11 @@ def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=N
         N[i] += N_new[i]
 
     return mu_class, std_class, N
+
+def hellinger(m1,s1,m2,s2):
+    temp = ((np.linalg.det(s1)**.25) * np.linalg.det(s2)**.25)/(np.linalg.det((s1+s2)/2)**.5)
+    H = 1 - temp * np.exp((-1/8)*(m1-m2).T*np.linalg.inv((s1+s2)/2)*(m1-m2))
+    return H
+
+def hellinger3(p, q):
+    return np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q)) ** 2)) / np.sqrt(2)
