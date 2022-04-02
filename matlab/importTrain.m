@@ -55,9 +55,9 @@ if nargin<1 || isempty(subjectpath)
     assert(any(subjectpath~=0), 'No file was chosen.'); % confirm the file is valid
 end
 
-DAQpath = [subjectpath '\DATA\DAQ'];
-MATpath = [subjectpath '\DATA\MAT'];
-TXTpath = [subjectpath '\DATA\TXT'];
+DAQpath = [subjectpath '\DATApost\DAQ'];
+MATpath = [subjectpath '\DATApost\MAT'];
+TXTpath = [subjectpath '\DATApost\TXT'];
 
 if exist(DAQpath,'dir') == 0
     folders = ls(subjectpath);
@@ -74,9 +74,9 @@ inc = 25;
 for subs = 1:iter
     if iter > 1
         subjectpath = [fullpath '\' folders(subs,:)];
-        DAQpath = [subjectpath '\DATA\DAQ'];
-        MATpath = [subjectpath '\DATA\MAT'];
-        TXTpath = [subjectpath '\DATA\TXT'];
+        DAQpath = [subjectpath '\DATApost\DAQ'];
+        MATpath = [subjectpath '\DATApost\MAT'];
+        TXTpath = [subjectpath '\DATApost\TXT'];
     end
     disp(['Retrieving ' subjectpath]);
     if exist(MATpath,'dir')==0 %check if MAT folder exists in user's data folder. If not make one and save all converted files

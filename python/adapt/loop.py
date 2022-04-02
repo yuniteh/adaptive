@@ -292,7 +292,7 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
 
     if test_key:
         test_dof = np.unique(test_params[:,-1])
-        print('init test dof: ' + str(test_dof))
+        # print('init test dof: ' + str(test_dof))
         xtra_dof = ~np.isin(test_dof,train_dof)
         for dof in test_dof[xtra_dof]:
             print('removing extra test DOF ' + str(dof))
@@ -307,7 +307,7 @@ def check_labels(test_data,test_params,train_dof,key,test_key=True):
             if np.sum(ind) > 0:
                 key2[train_dof==dof] = np.nanmean(test_params[ind,0])
     
-        print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
+        # print('test_dof: ' + str(test_dof) + ', key: ' + str(key2))
 
     return test_data, test_params
 
