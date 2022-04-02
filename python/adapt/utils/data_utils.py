@@ -601,8 +601,39 @@ def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=N
 
 def hellinger(m1,s1,m2,s2):
     temp = ((np.linalg.det(s1)**.25) * np.linalg.det(s2)**.25)/(np.linalg.det((s1+s2)/2)**.5)
-    H = 1 - temp * np.exp((-1/8)*(m1-m2).T*np.linalg.inv((s1+s2)/2)*(m1-m2))
-    return H
+    if (np.linalg.det(s1 + s2)/2) != 0:
+        covXY_inverted = np.linalg.inv((s1 + s2)/2)
+    else:
+        covXY_inverted = np.linalg.pinv((s1 + s2)/2)
+    H = 1 - temp * np.exp((-1/8)*np.dot(np.dot((m1-m2).T,covXY_inverted),(m1-m2)))       
+
+    meanX = m1
+    meanY = m2
+    covX = s1
+    covY = s2
+    detX = np.linalg.det(covX)
+    detY = np.linalg.det(covY)
+    detXY = np.linalg.det((covX + covY)/2)
+    if (np.linalg.det(covX + covY)/2) != 0:
+        covXY_inverted = np.linalg.inv((covX + covY)/2)
+    else:
+        covXY_inverted = np.linalg.pinv((covX + covY)/2)    
+    dist = 1 - ((detX**.25 * detY**.25) / detXY**.5) * np.exp(-.125 * np.dot(np.dot(np.transpose(meanX-meanY),covXY_inverted),(meanX - meanY)))
+    # print(temp)
+    return np.sum(np.sum(dist.astype(np.longdouble)))
 
 def hellinger3(p, q):
     return np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q)) ** 2)) / np.sqrt(2)
+
+def bhatta(m1,s1,m2,s2):
+    print(np.linalg.det(s2))
+    b = .125 * (m1-m2).T*np.linalg.inv((s1+s2)/2)*(m1-m2)+.5*np.log((np.linalg.det((s1+s2)/2))/(np.sqrt(np.linalg.det(s2)*np.linalg.det(s1))))
+    return np.nanmean(np.nanmean(b))
+
+def mahal(m1,s1,m2,s2):
+    if (np.linalg.det((s1+s2)/2)) != 0:
+        cov_inv = np.linalg.inv((s1+s2)/2)
+    else:
+        cov_inv = np.linalg.pinv((s1+s2)/2)
+    m = np.sqrt((m1-m2).T*(cov_inv)*(m1-m2))
+    return m
