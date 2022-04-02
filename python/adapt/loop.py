@@ -186,7 +186,7 @@ def train_task(model, num_iter, disp_freq, x_train, y_train, x_test=[], y_test=N
     
     return w, c, elapsed
 
-def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=128, dec=True, bn_training=True, prog_train=True):
+def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None, n_dof=7, ep=30, mod=None, cnnlda=False, adapt=False, print_b=False, lr=0.001, bat=128, dec=True, bn_training=True, bn_trainable = True, prog_train=True):
     # Train NNs
     out = []
     for model in mod:
@@ -234,7 +234,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                     lam_in = [100,10]
 
                 for x, y, _ in ds:
-                    train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, bn_training=bn_training, adapt=adapt, prog_train=prog_train)
+                    train_mod(x, y, model, optimizer, train_loss, train_accuracy=train_accuracy, clda=w_c, bn_training=bn_training, trainable=bn_trainable, adapt=adapt, prog_train=prog_train)
 
                 if print_b:
                     # if epoch == 0 or epoch == ep-1:
