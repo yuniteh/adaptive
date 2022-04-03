@@ -233,6 +233,66 @@ def add_noise_caps(raw, params,num_classes=None):
     clean = truncate(clean)
     return noisy,clean,y
 
+def add_noise_aug(raw,ft='tdar'):
+    all_ch = raw.shape[1]
+    split = 11
+
+    out = np.array([]).reshape(0,all_ch,200)
+    x = np.linspace(0,0.2,200)
+
+    # loop through channel noise
+    ch_all = np.arange(all_ch)
+    ch_split = raw.shape[0]//(split)
+    raw = raw[:ch_split*split,...]
+    temp = cp.deepcopy(raw)
+    t_label = np.zeros((temp.shape[0],all_ch))
+    # ch_split = temp.shape[0]//(split*len(ch_all))
+    
+    
+    
+    # loop through all channel combinations
+    # for ch in ch_all:
+    #     temp[(split*ch)*ch_split:(split*ch+1)*ch_split,ch,:] = np.random.normal(0,.001,temp.shape[2]) #0
+    #     for amp in range(1,6):
+    #         sig_60 = amp*np.sin(2*np.pi*60*x)
+    #         temp[(split*ch+amp)*ch_split:(split*ch+amp+1)*ch_split,ch,:] += sig_60
+    #         t_label[(split*ch+amp)*ch_split:(split*ch+amp+1)*ch_split] = amp
+    #         sig_norm = np.random.normal(0,amp,temp.shape[2])
+    #         temp[(split*ch+amp+5)*ch_split:(split*ch+amp+6)*ch_split,ch,:] += sig_norm
+    #         t_label[(split*ch+amp+5)*ch_split:(split*ch+amp+6)*ch_split] = amp+5
+
+    temp[:ch_split,:,:] = np.random.normal(0,.001,temp.shape[2]) #0
+    for amp in range(1,6):
+        sig_60 = amp*np.sin(2*np.pi*60*x)
+        temp[amp*ch_split:(amp+1)*ch_split,:,:] += sig_60
+        t_label[amp*ch_split:(amp+1)*ch_split,:] = amp/10
+        sig_norm = np.random.normal(0,amp,temp.shape[2])
+        temp[(amp+5)*ch_split:(amp+6)*ch_split,:,:] += sig_norm
+        t_label[(amp+5)*ch_split:(amp+6)*ch_split,:] = (amp+5)/10
+
+    out = np.concatenate((out,temp))
+    
+    noisy, clean = out, raw
+
+    clean = clean[...,np.newaxis]
+    noisy = noisy[...,np.newaxis]
+
+    noisy = truncate(noisy)
+    clean = truncate(clean)
+
+    x_clean, _, _, _= extract_scale(clean,scaler=None,ft=ft,caps=True) 
+    x_noise, _, _, _= extract_scale(noisy,scaler=None,ft=ft,caps=True) 
+
+    x_clean = x_clean.reshape((x_clean.shape[0]*x_clean.shape[1],x_clean.shape[2]))
+    x_noise = x_noise.reshape((x_noise.shape[0]*x_noise.shape[1],x_noise.shape[2]))
+    t_label = t_label.reshape((t_label.shape[0]*t_label.shape[1],))
+
+    scaler = MinMaxScaler(feature_range=(0,1))
+    x_scaled = scaler.fit_transform(x_clean)
+    x_n_scaled = scaler.transform(x_noise)
+    
+    return t_label,x_clean,x_noise,x_scaled,x_n_scaled,scaler
+
 def threshold(raw,params, z_mav=0):
     # raw format (samps x chan x win)
     if raw.shape[-1] == 1:
@@ -259,7 +319,6 @@ def threshold(raw,params, z_mav=0):
     params_out = np.vstack((params_z,params_out))
 
     return raw_out, params_out, z_mav
-
 
 def extract_feats_caps(raw,ft='feat',uint=False,order=6):
     # raw format (samps x chan x win)

@@ -1,4 +1,3 @@
-from pyrsistent import T
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization, Conv2DTranspose, Reshape, Concatenate
@@ -169,6 +168,7 @@ class AUG(Model):
         self.dense2 = Dense(32,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
         self.dense3 = Dense(dim,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.cat = Concatenate()
     
     def call(self,x,t):
         x2 = tf.cast(tf.tile(t[...,tf.newaxis],[1,x.shape[1]]),x.dtype)
@@ -367,13 +367,14 @@ def get_fish():
     
 def get_aug():
     @tf.function
-    def train_step(x,y,t,mod,optimizer):
+    def train_step(x,y,t,mod,optimizer,train_loss):
         with tf.GradientTape() as tape:
             mod_out = mod(x,t)
             loss = K.sum(tf.keras.losses.mean_squared_error(y,mod_out))
 
         gradients = tape.gradient(loss, mod.trainable_variables)
         optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+        train_loss(loss)
 
     return train_step
 

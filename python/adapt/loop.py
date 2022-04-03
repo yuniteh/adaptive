@@ -276,7 +276,7 @@ def train_aug(x_train,y_train,type_train,ep=30,bat=128,print_b=True):
         train_loss.reset_states()
 
         for x, y, t in ds:
-            train_mod(x,y,t,model,optimizer)
+            train_mod(x,y,t,model,optimizer,train_loss)
 
         if print_b:
             print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}')
