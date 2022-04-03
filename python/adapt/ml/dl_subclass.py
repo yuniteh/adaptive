@@ -1,3 +1,4 @@
+from pyrsistent import T
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, BatchNormalization, Conv2DTranspose, Reshape, Concatenate
@@ -159,6 +160,24 @@ class CNNtop(Model):
         x = self.conv1(x)
         x = self.bn1(x, training=train)
         return x
+
+class AUG(Model):
+    def __init__(self,dim=10,name='aug'):
+        super(AUG,self).__init__(name=name)
+        self.dense1 = Dense(64,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn1 = BatchNormalization()
+        self.dense2 = Dense(32,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.bn2 = BatchNormalization()
+        self.dense3 = Dense(dim,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+    
+    def call(self,x,t):
+        x2 = tf.cast(tf.tile(t[...,tf.newaxis],[1,x.shape[1]]),x.dtype)
+        x = self.cat([x,x2])
+        x = self.dense1(x)
+        x = self.bn1(x)
+        x = self.dense2(x)
+        x = self.bn2(x)
+        return self.dense3(x)
 
 ## Classifier
 class VCLF(Model):
@@ -345,6 +364,18 @@ def get_fish():
         gradients = tape.gradient(loss,mod.trainable_weights)
         return gradients
     return train_fish
+    
+def get_aug():
+    @tf.function
+    def train_step(x,y,t,mod,optimizer):
+        with tf.GradientTape() as tape:
+            mod_out = mod(x,t)
+            loss = K.sum(tf.keras.losses.mean_squared_error(y,mod_out))
+
+        gradients = tape.gradient(loss, mod.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, mod.trainable_variables))
+
+    return train_step
 
 def get_train():
     @tf.function

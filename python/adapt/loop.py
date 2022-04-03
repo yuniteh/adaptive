@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from adapt.ml.dl_subclass import CNN, VCNN, get_train, get_test
+from adapt.ml.dl_subclass import CNN, VCNN, get_train, get_test, AUG, get_aug
 from adapt.ml.lda import train_lda, eval_lda
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -256,6 +256,37 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 out.extend([w_c,c_c])
 
             tf.keras.backend.clear_session()
+    return out
+
+def train_aug(x_train,y_train,type_train,ep=30,bat=128,print_b=True):
+    out = []
+    ds = tf.data.Dataset.from_tensor_slices((x_train, y_train, type_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
+    model = AUG(dim=x_train.shape[1])
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+    train_loss = tf.keras.metrics.Mean(name='train_loss')
+    
+    train_mod = get_aug()
+
+    print('training aug')
+    start_time = time.time()
+    
+    for epoch in range(ep):
+        # Reset the metrics at the start of the next epoch
+        train_loss.reset_states()
+
+        for x, y, t in ds:
+            train_mod(x,y,t,model,optimizer)
+
+        if print_b:
+            print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}')
+    
+    elapsed = time.time() - start_time
+    print('time: ' + str(elapsed))
+    out.extend([model,elapsed])
+
+    tf.keras.backend.clear_session()
+
     return out
 
 def test_models(x_test_cnn, y_test, x_lda, y_lda, cnn=None, lda=None, clda=None, test_mod=None, test_accuracy=None):
