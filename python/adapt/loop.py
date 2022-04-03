@@ -206,7 +206,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 w_c = model[1:3]
                 model = model[0]
 
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
             # optimizer = tf.keras.optimizers.SGD(learning_rate=.0001)
             train_loss = tf.keras.metrics.Mean(name='train_loss')
             sec_loss = tf.keras.metrics.Mean(name='sec_loss')

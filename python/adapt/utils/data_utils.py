@@ -233,7 +233,7 @@ def add_noise_caps(raw, params,num_classes=None):
     clean = truncate(clean)
     return noisy,clean,y
 
-def aug_gen(raw, params, mod, scaler, num_classes=None):
+def aug_gen(raw, params, mod, scaler, out_scaler):
     all_ch = raw.shape[1]
     num_ch = 4
     split = 6
@@ -242,11 +242,7 @@ def aug_gen(raw, params, mod, scaler, num_classes=None):
     sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
     orig = np.tile(raw,(rep*(num_ch-1)+1,1,1))
 
-    out = np.array([]).reshape(0,all_ch,200)
-    x = np.linspace(0,0.2,200)
-
-    ch_split = raw.shape[0]//(split*len(ch_all))
-    temp_t = np.ones((ch_split,))
+    out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
 
     # repeat twice if adding gauss and flat
     for rep_i in range(rep):   
@@ -254,7 +250,10 @@ def aug_gen(raw, params, mod, scaler, num_classes=None):
         for num_noise in range(start_ch,num_ch):
             # find all combinations of noisy channels
             ch_all = list(combinations(range(0,all_ch),num_noise))
+            ch_split = raw.shape[0]//(split*len(ch_all))
+            temp_t = np.ones((ch_split,))
             temp = cp.deepcopy(raw)
+            temp_full = np.ones((raw.shape[0],))
 
             # loop through all channel combinations
             for ch in range(0,len(ch_all)):
@@ -268,23 +267,29 @@ def aug_gen(raw, params, mod, scaler, num_classes=None):
                 ch_ind = 0
                 for i in ch_all[ch]:       
                     if rep_i == 0:
-                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = mod(temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:],temp_t*0)
+                        temp_full[6*ch*ch_split:(6*ch+1)*ch_split] = temp_t*0
                         for amp in range(1,6):
-                            temp[amp*ch_split:(amp+1)*ch_split,i,:] = mod(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:],temp_t*amp/10)
+                            temp_full[amp*ch_split:(amp+1)*ch_split] = temp_t*amp/10
+                        temp[:,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[:,i,:])),temp_full))[...,np.newaxis]
+                        # temp[6*ch*ch_split:(6*ch+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:]),temp_t*0))[...,np.newaxis]
+                        # for amp in range(1,6):
+                        #     temp[amp*ch_split:(amp+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:]),temp_t*amp/10))[...,np.newaxis]
                     else:        
+                        temp_full[6*ch*ch_split:(6*ch+1)*ch_split] = ch_rand[:,ch_ind]/10
                         for amp in range(1,6):
-                            temp[amp*ch_split:(amp+1)*ch_split,i,:] = mod(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:],temp_t*(amp+5)/10)
-                        temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:] = mod(temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:],ch_rand[:,ch_ind]/10)
+                            temp_full[amp*ch_split:(amp+1)*ch_split] = temp_t*(amp+5)/10
+                        temp[:,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[:,i,:])),temp_full))[...,np.newaxis]
+
+                        # for amp in range(1,6):
+                        #     temp[amp*ch_split:(amp+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:]),temp_t*(amp+5)/10))[...,np.newaxis]
+                        # temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:]),ch_rand[:,ch_ind]/10))[...,np.newaxis]
                     ch_ind += 1 
 
             out = np.concatenate((out,temp))
     
     out = np.concatenate((raw, out))
 
-    noisy, clean, y = out, orig, to_categorical(sub_params[:,0],num_classes=num_classes)
-
-    noisy = scaler.inverse_transform(noisy)
-    clean = scaler.inverse_transform(clean)
+    noisy, clean, y = out, orig, sub_params
     
     return noisy,clean,y
 
@@ -328,11 +333,12 @@ def add_noise_aug(raw,ft='tdar'):
     x_noise = x_noise.reshape((x_noise.shape[0]*x_noise.shape[1],x_noise.shape[2]))
     t_label = t_label.reshape((t_label.shape[0]*t_label.shape[1],))
 
-    scaler = MinMaxScaler(feature_range=(0,1))
+    scaler = MinMaxScaler(feature_range=(-1,1))
     x_scaled = scaler.fit_transform(x_clean)
-    x_n_scaled = scaler.transform(x_noise)
+    out_scaler = MinMaxScaler(feature_range=(-1,1))
+    x_n_scaled = out_scaler.fit_transform(x_noise)
     
-    return t_label,x_clean,x_noise,x_scaled,x_n_scaled,scaler
+    return t_label,x_clean,x_noise,x_scaled,x_n_scaled,scaler,out_scaler
 
 def threshold(raw,params, z_mav=0):
     # raw format (samps x chan x win)

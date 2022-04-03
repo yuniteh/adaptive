@@ -163,11 +163,11 @@ class CNNtop(Model):
 class AUG(Model):
     def __init__(self,dim=10,name='aug'):
         super(AUG,self).__init__(name=name)
-        self.dense1 = Dense(64,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.dense1 = Dense(64,activation='tanh', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn1 = BatchNormalization()
         self.dense2 = Dense(32,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.bn2 = BatchNormalization()
-        self.dense3 = Dense(dim,activation='relu', activity_regularizer=tf.keras.regularizers.l1(10e-5))
+        self.dense3 = Dense(dim,activation='sigmoid', activity_regularizer=tf.keras.regularizers.l1(10e-5))
         self.cat = Concatenate()
     
     def call(self,x,t):
