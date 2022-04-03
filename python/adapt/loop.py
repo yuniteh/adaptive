@@ -258,7 +258,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
             tf.keras.backend.clear_session()
     return out
 
-def train_aug(x_train,y_train,type_train,ep=30,bat=128,print_b=True):
+def train_aug(x_train,y_train,type_train,ep=30,bat=128,print_b=False):
     out = []
     ds = tf.data.Dataset.from_tensor_slices((x_train, y_train, type_train)).shuffle(x_train.shape[0],reshuffle_each_iteration=True).batch(bat)
     model = AUG(dim=x_train.shape[1])

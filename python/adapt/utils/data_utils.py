@@ -233,6 +233,61 @@ def add_noise_caps(raw, params,num_classes=None):
     clean = truncate(clean)
     return noisy,clean,y
 
+def aug_gen(raw, params, mod, scaler, num_classes=None):
+    all_ch = raw.shape[1]
+    num_ch = 4
+    split = 6
+    rep = 2
+    start_ch = 1
+    sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
+    orig = np.tile(raw,(rep*(num_ch-1)+1,1,1))
+
+    out = np.array([]).reshape(0,all_ch,200)
+    x = np.linspace(0,0.2,200)
+
+    ch_split = raw.shape[0]//(split*len(ch_all))
+    temp_t = np.ones((ch_split,))
+
+    # repeat twice if adding gauss and flat
+    for rep_i in range(rep):   
+        # loop through channel noise
+        for num_noise in range(start_ch,num_ch):
+            # find all combinations of noisy channels
+            ch_all = list(combinations(range(0,all_ch),num_noise))
+            temp = cp.deepcopy(raw)
+
+            # loop through all channel combinations
+            for ch in range(0,len(ch_all)):
+                ch_rand = np.random.randint(11,size = (ch_split,num_noise))
+
+                if num_noise > 1:
+                    for i in range(ch_split):
+                        while np.array([x == ch_rand[i,0] for x in ch_rand[i,:]]).all():
+                            ch_rand[i,:] = np.random.randint(11,size = num_noise)
+
+                ch_ind = 0
+                for i in ch_all[ch]:       
+                    if rep_i == 0:
+                        temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:] = mod(temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:],temp_t*0)
+                        for amp in range(1,6):
+                            temp[amp*ch_split:(amp+1)*ch_split,i,:] = mod(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:],temp_t*amp/10)
+                    else:        
+                        for amp in range(1,6):
+                            temp[amp*ch_split:(amp+1)*ch_split,i,:] = mod(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:],temp_t*(amp+5)/10)
+                        temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:] = mod(temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:],ch_rand[:,ch_ind]/10)
+                    ch_ind += 1 
+
+            out = np.concatenate((out,temp))
+    
+    out = np.concatenate((raw, out))
+
+    noisy, clean, y = out, orig, to_categorical(sub_params[:,0],num_classes=num_classes)
+
+    noisy = scaler.inverse_transform(noisy)
+    clean = scaler.inverse_transform(clean)
+    
+    return noisy,clean,y
+
 def add_noise_aug(raw,ft='tdar'):
     all_ch = raw.shape[1]
     split = 11
@@ -246,20 +301,6 @@ def add_noise_aug(raw,ft='tdar'):
     raw = raw[:ch_split*split,...]
     temp = cp.deepcopy(raw)
     t_label = np.zeros((temp.shape[0],all_ch))
-    # ch_split = temp.shape[0]//(split*len(ch_all))
-    
-    
-    
-    # loop through all channel combinations
-    # for ch in ch_all:
-    #     temp[(split*ch)*ch_split:(split*ch+1)*ch_split,ch,:] = np.random.normal(0,.001,temp.shape[2]) #0
-    #     for amp in range(1,6):
-    #         sig_60 = amp*np.sin(2*np.pi*60*x)
-    #         temp[(split*ch+amp)*ch_split:(split*ch+amp+1)*ch_split,ch,:] += sig_60
-    #         t_label[(split*ch+amp)*ch_split:(split*ch+amp+1)*ch_split] = amp
-    #         sig_norm = np.random.normal(0,amp,temp.shape[2])
-    #         temp[(split*ch+amp+5)*ch_split:(split*ch+amp+6)*ch_split,ch,:] += sig_norm
-    #         t_label[(split*ch+amp+5)*ch_split:(split*ch+amp+6)*ch_split] = amp+5
 
     temp[:ch_split,:,:] = np.random.normal(0,.001,temp.shape[2]) #0
     for amp in range(1,6):
