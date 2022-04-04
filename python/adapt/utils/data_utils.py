@@ -162,7 +162,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
 
 def add_noise_caps(raw, params,num_classes=None):
     all_ch = raw.shape[1]
-    num_ch = 4
+    num_ch = 5
     split = 6
     rep = 2
     start_ch = 1
@@ -237,48 +237,51 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     all_ch = raw.shape[1]
     num_ch = 5
     split = 6
+    split = 12
     rep = 2
     start_ch = 1
-    sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
-    orig = np.tile(raw,(rep*(num_ch-1)+1,1,1,1))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
+    m = list(params.shape[1:])
+    m.insert(0,0)
+    y_out = np.array([]).reshape(m)
 
     # loop through channel noise
     for num_noise in range(start_ch,num_ch):
         # find all combinations of noisy channels
-        ch_all = list(combinations(range(0,all_ch),num_noise))
-        ch_split = raw.shape[0]//(split*len(ch_all))
-        temp_t = np.ones((ch_split,))
-        temp = np.tile(raw,(2,1,1,1))
-        temp_full = np.ones((raw.shape[0]*2,))
+        ch_all = np.array(list(combinations(range(0,all_ch),num_noise)))
+        ch_tile = np.ones((ch_all.ndim,)).astype(int)
+        ch_tile[0] = int((raw.shape[0]*rep)//ch_all.shape[0])
+        # temp = np.tile(raw[:ch_tile[0]*ch_all.shape[0],...],(rep,1,1,1))
+        temp = np.tile(raw,(rep,1,1,1))[:int(ch_tile[0]*ch_all.shape[0]),...]
+        y = np.tile(params,(rep,1))[:int(ch_tile[0]*ch_all.shape[0]),...]
 
-        # loop through all channel combinations
-        for ch in range(0,len(ch_all)):
-            ch_rand = np.random.randint(11,size = (ch_split,num_noise))
+        ch_split = int(temp.shape[0]//split)
+        ch_tot = np.tile(ch_all,ch_tile)
+        temp = temp[:ch_split*split,...]
+        y = y[:ch_split*split,...]
+        ch_tot = ch_tot[:ch_split*split,...]
+        temp_full = np.zeros((temp.shape[0],))
+        ch_rand = np.random.randint(11,size = (ch_split,num_noise))
 
-            if num_noise > 1:
-                for i in range(ch_split):
-                    while np.array([x == ch_rand[i,0] for x in ch_rand[i,:]]).all():
-                        ch_rand[i,:] = np.random.randint(11,size = num_noise)
+        temp_full[:ch_split] = 0
+        for amp in range(1,6):
+            temp_full[amp*ch_split:(amp+1)*ch_split] = amp/10
+            temp_full[(amp+5)*ch_split:(amp+6)*ch_split] = (amp+5)/10
 
-            ch_ind = 0
-            for i in ch_all[ch]:       
-                temp_full[(12*ch)*ch_split:(12*ch+1)*ch_split] = temp_t*0
-                for amp in range(1,6):
-                    temp_full[(12*ch+amp)*ch_split:(12*ch+amp+1)*ch_split] = temp_t*amp/10
-                    temp_full[(12*ch+amp+5)*ch_split:(12*ch+amp+6)*ch_split] = temp_t*(amp+5)/10
-                temp_full[(12*ch+11)*ch_split:(12*ch+12)*ch_split] = ch_rand[:,ch_ind]/10
-                temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:])),temp_full[12*ch*ch_split:(12*ch+12)*ch_split]))[...,np.newaxis]
-                ch_ind += 1 
-
+        for i in range(num_noise):
+            temp_full[-ch_split:] = ch_rand[:,i]/10
+            temp[np.arange(temp.shape[0]),ch_tot[:,i],:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[np.arange(temp.shape[0]),ch_tot[:,i],:])),temp_full))[...,np.newaxis]
+        
+        y_out = np.concatenate((y_out,y))
         out = np.concatenate((out,temp))
     
     out = np.concatenate((raw, out))
+    y_out = np.concatenate((params,y_out))
 
-    noisy, clean, y = out, orig, sub_params
+    # noisy, clean, y = out, orig, sub_params
     
-    return noisy,clean,y
+    return out,0,y_out,temp_full
 
 def add_noise_aug(raw,ft='tdar'):
     all_ch = raw.shape[1]
@@ -295,6 +298,7 @@ def add_noise_aug(raw,ft='tdar'):
     t_label = np.zeros((temp.shape[0],all_ch))
 
     temp[:ch_split,:,:] = np.random.normal(0,.001,temp.shape[2]) #0
+    t_label[:ch_split,:] = 0
     for amp in range(1,6):
         sig_60 = amp*np.sin(2*np.pi*60*x)
         temp[amp*ch_split:(amp+1)*ch_split,:,:] += sig_60
@@ -619,7 +623,7 @@ def matAR(data,order):
 
     return AR[1:,:].T
 
-def set_mean(data,label, N=0,mu_class=None,std_class=None):
+def set_mean(data,label, key, N=0,mu_class=None,std_class=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = list(data.shape[1:])
@@ -634,7 +638,7 @@ def set_mean(data,label, N=0,mu_class=None,std_class=None):
     ALPHA = np.zeros(N.shape)
     N_new = np.zeros((n_class,))
     
-    for i in range(0, n_class):
+    for i in key:
         ind = np.squeeze(np.argmax(label,axis=1) == u_class[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
@@ -645,6 +649,54 @@ def set_mean(data,label, N=0,mu_class=None,std_class=None):
     return mu_class, std_class, N
 
 def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=None):
+    if not isinstance(data,np.ndarray):
+        data = data.numpy()
+    m = list(data.shape[1:])
+
+    key = key.astype(int)
+    prev_key = prev_key.astype(int)
+
+    m.insert(0,len(key))
+    N_new = np.zeros((len(key,)))
+    N_fixed = np.zeros((len(key,)))
+    mu_fixed = np.zeros(m)
+    std_fixed = np.zeros(m)
+
+    for k in prev_key:
+        N_fixed[k] = N[k]
+        mu_fixed[k,...] = mu_class[k,...]
+        std_fixed[k,...] = std_class[k,...]
+    N = cp.deepcopy(N_fixed)
+    mu_class = cp.deepcopy(mu_fixed)
+    std_class = cp.deepcopy(std_fixed)
+    ALPHA = np.zeros(N.shape)
+    
+    # for i in range(len(prev_key)):
+    old_class = np.isin(key,prev_key,assume_unique=True)
+    for i in key[old_class]:
+        # ind = np.squeeze(np.argmax(label,axis=1) == i)
+        ind = np.squeeze(label[:,i] == 1)
+        N_new[i] = np.sum(ind)
+        if N_new[i] > 0:
+            ALPHA[i] = N[i] / (N[i] + N_new[i])
+            mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+            std_class[i,...] = ALPHA[i] * std_class[i,...] + (1 - ALPHA[i]) * np.std(data[ind,...],axis=0)
+            N[i] += N_new[i]
+    
+    new_class = ~np.isin(key,prev_key, assume_unique=True)
+    for i in key[new_class]:
+        print('new class avcnn')
+        # ind = np.squeeze(np.argmax(label,axis=1) == i)
+        ind = np.squeeze(label[:,i] == 1)
+        N_new[i] = np.sum(ind)
+        mu_class[i,...] = np.mean(data[ind,...],axis=0,keepdims=True)
+        std_class[i,...] = np.std(data[ind,...],axis=0)
+        
+        N[i] += N_new[i]
+
+    return mu_class, std_class, N
+
+def update_mean_old(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = list(data.shape[1:])
