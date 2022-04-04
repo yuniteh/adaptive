@@ -162,7 +162,7 @@ def prep_test_caps(x, params, scaler=None, emg_scale=None, num_classes=None,ft='
 
 def add_noise_caps(raw, params,num_classes=None):
     all_ch = raw.shape[1]
-    num_ch = 4
+    num_ch = 5
     split = 6
     rep = 2
     start_ch = 1
@@ -619,7 +619,7 @@ def matAR(data,order):
 
     return AR[1:,:].T
 
-def set_mean(data,label, N=0,mu_class=None,std_class=None):
+def set_mean(data,label, key, N=0,mu_class=None,std_class=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = list(data.shape[1:])
@@ -634,7 +634,7 @@ def set_mean(data,label, N=0,mu_class=None,std_class=None):
     ALPHA = np.zeros(N.shape)
     N_new = np.zeros((n_class,))
     
-    for i in range(0, n_class):
+    for i in key:
         ind = np.squeeze(np.argmax(label,axis=1) == u_class[i])
         N_new[i] = np.sum(ind)
         ALPHA[i] = N[i] / (N[i] + N_new[i])
@@ -645,6 +645,52 @@ def set_mean(data,label, N=0,mu_class=None,std_class=None):
     return mu_class, std_class, N
 
 def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=None):
+    if not isinstance(data,np.ndarray):
+        data = data.numpy()
+    m = list(data.shape[1:])
+
+    key = key.astype(int)
+    prev_key = prev_key.astype(int)
+
+    m.insert(0,len(key))
+    N_new = np.zeros((len(key,)))
+    N_fixed = np.zeros((len(key,)))
+    mu_fixed = np.zeros(m)
+    std_fixed = np.zeros(m)
+
+    for k in prev_key:
+        N_fixed[k] = N[k]
+        mu_fixed[k,...] = mu_class[k,...]
+        std_fixed[k,...] = std_class[k,...]
+    N = cp.deepcopy(N_fixed)
+    mu_class = cp.deepcopy(mu_fixed)
+    std_class = cp.deepcopy(std_fixed)
+    ALPHA = np.zeros(N.shape)
+    
+    # for i in range(len(prev_key)):
+    old_class = np.isin(key,prev_key,assume_unique=True)
+    for i in key[old_class]:
+        ind = np.squeeze(np.argmax(label,axis=1) == k)
+        N_new[i] = np.sum(ind)
+        if N_new[i] > 0:
+            ALPHA[i] = N[i] / (N[i] + N_new[i])
+            mu_class[i,...] = ALPHA[i] * mu_class[i,...] + (1 - ALPHA[i]) * np.mean(data[ind,...],axis=0)                       # Update the mean vector
+            std_class[i,...] = ALPHA[i] * std_class[i,...] + (1 - ALPHA[i]) * np.std(data[ind,...],axis=0)
+            N[i] += N_new[i]
+    
+    new_class = ~np.isin(key,prev_key, assume_unique=True)
+    for i in key[new_class]:
+        print('new class avcnn')
+        ind = np.squeeze(np.argmax(label,axis=1) == k)
+        N_new[i] = np.sum(ind)
+        mu_class[i,...] = np.mean(data[ind,...],axis=0,keepdims=True)
+        std_class[i,...] = np.std(data[ind,...],axis=0)
+        
+        N[i] += N_new[i]
+
+    return mu_class, std_class, N
+
+def update_mean_old(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=None):
     if not isinstance(data,np.ndarray):
         data = data.numpy()
     m = list(data.shape[1:])
