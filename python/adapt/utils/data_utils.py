@@ -298,7 +298,7 @@ def add_noise_aug(raw,ft='tdar'):
     t_label = np.zeros((temp.shape[0],all_ch))
 
     temp[:ch_split,:,:] = np.random.normal(0,.001,temp.shape[2]) #0
-    t_label[:ch_split,:,:] = 0
+    t_label[:ch_split,:] = 0
     for amp in range(1,6):
         sig_60 = amp*np.sin(2*np.pi*60*x)
         temp[amp*ch_split:(amp+1)*ch_split,:,:] += sig_60
