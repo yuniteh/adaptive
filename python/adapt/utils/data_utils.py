@@ -241,6 +241,8 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     start_ch = 1
     sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
     orig = np.tile(raw,(rep*(num_ch-1)+1,1,1))
+    temp = np.tile(raw,(rep*(num_ch-1),1,1))
+    temp_full = np.ones((temp.shape[0],))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
 
