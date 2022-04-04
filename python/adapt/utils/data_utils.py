@@ -241,6 +241,8 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     start_ch = 1
     sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
     orig = np.tile(raw,(rep*(num_ch-1)+1,1,1,1))
+    sub_params = np.tile(params,(2,1))
+    orig = np.tile(raw,(2,1,1,1))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
 
@@ -250,8 +252,8 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
         ch_all = list(combinations(range(0,all_ch),num_noise))
         ch_split = raw.shape[0]//(split*len(ch_all))
         temp_t = np.ones((ch_split,))
-        temp = np.tile(raw,(2,1,1,1))
-        temp_full = np.ones((raw.shape[0]*2,))
+        temp = np.tile(raw,(rep,1,1,1))
+        temp_full = np.zeros((raw.shape[0]*2,))
 
         # loop through all channel combinations
         for ch in range(0,len(ch_all)):
@@ -277,6 +279,8 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     out = np.concatenate((raw, out))
 
     noisy, clean, y = out, orig, sub_params
+    noisy, clean, y = orig, orig, sub_params
+
     
     return noisy,clean,y,temp_full
 
@@ -670,7 +674,8 @@ def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=N
     # for i in range(len(prev_key)):
     old_class = np.isin(key,prev_key,assume_unique=True)
     for i in key[old_class]:
-        ind = np.squeeze(np.argmax(label,axis=1) == k)
+        # ind = np.squeeze(np.argmax(label,axis=1) == i)
+        ind = np.squeeze(label[:,i] == 1)
         N_new[i] = np.sum(ind)
         if N_new[i] > 0:
             ALPHA[i] = N[i] / (N[i] + N_new[i])
@@ -681,7 +686,8 @@ def update_mean(data,label, N=0,mu_class=None,std_class=None,key=None,prev_key=N
     new_class = ~np.isin(key,prev_key, assume_unique=True)
     for i in key[new_class]:
         print('new class avcnn')
-        ind = np.squeeze(np.argmax(label,axis=1) == k)
+        # ind = np.squeeze(np.argmax(label,axis=1) == i)
+        ind = np.squeeze(label[:,i] == 1)
         N_new[i] = np.sum(ind)
         mu_class[i,...] = np.mean(data[ind,...],axis=0,keepdims=True)
         std_class[i,...] = np.std(data[ind,...],axis=0)

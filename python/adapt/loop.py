@@ -239,7 +239,7 @@ def train_models(traincnn=None, y_train=None, x_train_lda=None, y_train_lda=None
                 if print_b:
                     # if epoch == 0 or epoch == ep-1:
                     print(f'Epoch {epoch + 1}, ', f'Loss: {train_loss.result():.2f}, ',f'Second Loss: {sec_loss.result():.2f}, ',f'KL Loss: {kl_loss.result():.2f}, ', f'Accuracy: {train_accuracy.result() * 100:.2f} ')
-            
+            print('oop')
             elapsed = time.time() - start_time
             print('time: ' + str(elapsed))
             out.extend([model,elapsed])
