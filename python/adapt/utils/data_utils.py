@@ -241,8 +241,6 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     start_ch = 1
     sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
     orig = np.tile(raw,(rep*(num_ch-1)+1,1,1,1))
-    sub_params = np.tile(params,(2,1))
-    orig = np.tile(raw,(2,1,1,1))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
 
@@ -279,8 +277,6 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     out = np.concatenate((raw, out))
 
     noisy, clean, y = out, orig, sub_params
-    noisy, clean, y = orig, orig, sub_params
-
     
     return noisy,clean,y,temp_full
 
