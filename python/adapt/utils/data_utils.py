@@ -240,8 +240,6 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
     split = 12
     rep = 2
     start_ch = 1
-    sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
-    orig = np.tile(raw,(rep*(num_ch-1)+1,1,1,1))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
     m = list(params.shape[1:])
@@ -259,15 +257,10 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
         y = np.tile(params,(rep,1))[:int(ch_tile[0]*ch_all.shape[0]),...]
 
         ch_split = int(temp.shape[0]//split)
-        print(ch_all.shape)
-        print(ch_tile)
         ch_tot = np.tile(ch_all,ch_tile)
         temp = temp[:ch_split*split,...]
         y = y[:ch_split*split,...]
         ch_tot = ch_tot[:ch_split*split,...]
-        # ch_split = raw.shape[0]//(split*ch_all.shape[0])
-        # temp_t = np.ones((ch_split,))
-        # temp = np.tile(raw,(rep,1,1,1))
         temp_full = np.zeros((temp.shape[0],))
         ch_rand = np.random.randint(11,size = (ch_split,num_noise))
 
@@ -279,25 +272,6 @@ def aug_gen(raw, params, mod, scaler, out_scaler):
         for i in range(num_noise):
             temp_full[-ch_split:] = ch_rand[:,i]/10
             temp[np.arange(temp.shape[0]),ch_tot[:,i],:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[np.arange(temp.shape[0]),ch_tot[:,i],:])),temp_full))[...,np.newaxis]
-
-        # loop through all channel combinations
-        # for ch in range(ch_all.shape[0]):
-        #     ch_rand = np.random.randint(11,size = (ch_split,num_noise))
-
-        #     if num_noise > 1:
-        #         for i in range(ch_split):
-        #             while np.array([x == ch_rand[i,0] for x in ch_rand[i,:]]).all():
-        #                 ch_rand[i,:] = np.random.randint(11,size = num_noise)
-
-        #     ch_ind = 0
-        #     for i in ch_all[ch]:       
-        #         temp_full[(12*ch)*ch_split:(12*ch+1)*ch_split] = temp_t*0
-        #         for amp in range(1,6):
-        #             temp_full[(12*ch+amp)*ch_split:(12*ch+amp+1)*ch_split] = temp_t*amp/10
-        #             temp_full[(12*ch+amp+5)*ch_split:(12*ch+amp+6)*ch_split] = temp_t*(amp+5)/10
-        #         temp_full[(12*ch+11)*ch_split:(12*ch+12)*ch_split] = ch_rand[:,ch_ind]/10
-        #         temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:])),temp_full[12*ch*ch_split:(12*ch+12)*ch_split]))[...,np.newaxis]
-        #         ch_ind += 1 
         
         y_out = np.concatenate((y_out,y))
         out = np.concatenate((out,temp))
@@ -324,6 +298,7 @@ def add_noise_aug(raw,ft='tdar'):
     t_label = np.zeros((temp.shape[0],all_ch))
 
     temp[:ch_split,:,:] = np.random.normal(0,.001,temp.shape[2]) #0
+    t_label[:ch_split,:,:] = 0
     for amp in range(1,6):
         sig_60 = amp*np.sin(2*np.pi*60*x)
         temp[amp*ch_split:(amp+1)*ch_split,:,:] += sig_60
