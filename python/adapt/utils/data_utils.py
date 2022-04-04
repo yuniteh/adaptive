@@ -235,59 +235,44 @@ def add_noise_caps(raw, params,num_classes=None):
 
 def aug_gen(raw, params, mod, scaler, out_scaler):
     all_ch = raw.shape[1]
-    num_ch = 4
+    num_ch = 5
     split = 6
     rep = 2
     start_ch = 1
     sub_params = np.tile(params,(rep*(num_ch-1)+1,1))
-    orig = np.tile(raw,(rep*(num_ch-1)+1,1,1))
-    temp = np.tile(raw,(rep*(num_ch-1),1,1))
-    temp_full = np.ones((temp.shape[0],))
+    orig = np.tile(raw,(rep*(num_ch-1)+1,1,1,1))
 
     out = np.array([]).reshape(0,all_ch,raw.shape[2],1)
 
-    # repeat twice if adding gauss and flat
-    for rep_i in range(rep):   
-        # loop through channel noise
-        for num_noise in range(start_ch,num_ch):
-            # find all combinations of noisy channels
-            ch_all = list(combinations(range(0,all_ch),num_noise))
-            ch_split = raw.shape[0]//(split*len(ch_all))
-            temp_t = np.ones((ch_split,))
-            temp = cp.deepcopy(raw)
-            temp_full = np.ones((raw.shape[0],))
+    # loop through channel noise
+    for num_noise in range(start_ch,num_ch):
+        # find all combinations of noisy channels
+        ch_all = list(combinations(range(0,all_ch),num_noise))
+        ch_split = raw.shape[0]//(split*len(ch_all))
+        temp_t = np.ones((ch_split,))
+        temp = np.tile(raw,(2,1,1,1))
+        temp_full = np.ones((raw.shape[0]*2,))
 
-            # loop through all channel combinations
-            for ch in range(0,len(ch_all)):
-                ch_rand = np.random.randint(11,size = (ch_split,num_noise))
+        # loop through all channel combinations
+        for ch in range(0,len(ch_all)):
+            ch_rand = np.random.randint(11,size = (ch_split,num_noise))
 
-                if num_noise > 1:
-                    for i in range(ch_split):
-                        while np.array([x == ch_rand[i,0] for x in ch_rand[i,:]]).all():
-                            ch_rand[i,:] = np.random.randint(11,size = num_noise)
+            if num_noise > 1:
+                for i in range(ch_split):
+                    while np.array([x == ch_rand[i,0] for x in ch_rand[i,:]]).all():
+                        ch_rand[i,:] = np.random.randint(11,size = num_noise)
 
-                ch_ind = 0
-                for i in ch_all[ch]:       
-                    if rep_i == 0:
-                        temp_full[6*ch*ch_split:(6*ch+1)*ch_split] = temp_t*0
-                        for amp in range(1,6):
-                            temp_full[amp*ch_split:(amp+1)*ch_split] = temp_t*amp/10
-                        temp[:,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[:,i,:])),temp_full))[...,np.newaxis]
-                        # temp[6*ch*ch_split:(6*ch+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[6*ch*ch_split:(6*ch+1)*ch_split,i,:]),temp_t*0))[...,np.newaxis]
-                        # for amp in range(1,6):
-                        #     temp[amp*ch_split:(amp+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:]),temp_t*amp/10))[...,np.newaxis]
-                    else:        
-                        temp_full[6*ch*ch_split:(6*ch+1)*ch_split] = ch_rand[:,ch_ind]/10
-                        for amp in range(1,6):
-                            temp_full[amp*ch_split:(amp+1)*ch_split] = temp_t*(amp+5)/10
-                        temp[:,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[:,i,:])),temp_full))[...,np.newaxis]
+            ch_ind = 0
+            for i in ch_all[ch]:       
+                temp_full[(12*ch)*ch_split:(12*ch+1)*ch_split] = temp_t*0
+                for amp in range(1,6):
+                    temp_full[(12*ch+amp)*ch_split:(12*ch+amp+1)*ch_split] = temp_t*amp/10
+                    temp_full[(12*ch+amp+5)*ch_split:(12*ch+amp+6)*ch_split] = temp_t*(amp+5)/10
+                temp_full[(12*ch+11)*ch_split:(12*ch+12)*ch_split] = ch_rand[:,ch_ind]/10
+                temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:] = out_scaler.inverse_transform(mod(scaler.transform(np.squeeze(temp[12*ch*ch_split:(12*ch+12)*ch_split,i,:])),temp_full[12*ch*ch_split:(12*ch+12)*ch_split]))[...,np.newaxis]
+                ch_ind += 1 
 
-                        # for amp in range(1,6):
-                        #     temp[amp*ch_split:(amp+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch+amp)*ch_split:(6*ch+amp+1)*ch_split,i,:]),temp_t*(amp+5)/10))[...,np.newaxis]
-                        # temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,...] = scaler.inverse_transform(mod(np.squeeze(temp[(6*ch)*ch_split:(6*ch+1)*ch_split,i,:]),ch_rand[:,ch_ind]/10))[...,np.newaxis]
-                    ch_ind += 1 
-
-            out = np.concatenate((out,temp))
+        out = np.concatenate((out,temp))
     
     out = np.concatenate((raw, out))
 
