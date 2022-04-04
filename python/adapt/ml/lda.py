@@ -51,7 +51,10 @@ def train_lda(data,label, key, mu_bool=False, mu_class = 0, C = 0):
                 Sw_temp += np.dot((row[:,np.newaxis] - mu_class[i,:]), (row[:,np.newaxis] - mu_class[i,:]).T)
             Sw += Sw_temp
         C /= n_class
-        u,v = eig(inv(Sw).dot(Sb))    
+        # try:
+        #     u,v = eig(inv(Sw).dot(Sb))    
+        # except:
+        u,v = eig(np.linalg.pinv(Sw).dot(Sb))    
         v = v[:,np.flip(np.argsort(np.abs(u)))]
         v = v[:,:6].real
 
