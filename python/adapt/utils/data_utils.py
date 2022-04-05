@@ -783,7 +783,7 @@ def mahal(m1,s1,m2,s2):
     m = np.sqrt((m1-m2).T*(cov_inv)*(m1-m2))
     return m
 
-def split_data(train_data,train_params):
+def split_data(train_data,train_params,it=1):
     tr_i = np.zeros((train_params.shape[0],))
     te_i = np.zeros((train_params.shape[0],))
     for cls in np.unique(train_params[:,-1]):
@@ -797,4 +797,8 @@ def split_data(train_data,train_params):
     val_params = train_params[te_i.astype(bool),...]
 
     train_data, train_params = train_temp, params_temp
-    return train_data, train_params, val_data, val_params
+
+    if it == 0:
+        return train_data, train_params, val_data, val_params
+    else:
+        return val_data, val_params,train_data, train_params
