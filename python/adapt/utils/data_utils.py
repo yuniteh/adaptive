@@ -782,3 +782,19 @@ def mahal(m1,s1,m2,s2):
         cov_inv = np.linalg.pinv((s1+s2)/2)
     m = np.sqrt((m1-m2).T*(cov_inv)*(m1-m2))
     return m
+
+def split_data(train_data,train_params):
+    tr_i = np.zeros((train_params.shape[0],))
+    te_i = np.zeros((train_params.shape[0],))
+    for cls in np.unique(train_params[:,-1]):
+        dof = np.array(np.where(train_params[:,-1] == cls))
+        tr_i[dof[0,:dof.shape[1]//2]] = 1
+        te_i[dof[0,dof.shape[1]//2:]] = 1
+
+    train_temp = train_data[tr_i.astype(bool),...]
+    params_temp = train_params[tr_i.astype(bool),...]
+    val_data = train_data[te_i.astype(bool),...]
+    val_params = train_params[te_i.astype(bool),...]
+
+    train_data, train_params = train_temp, params_temp
+    return train_data, train_params, val_data, val_params
