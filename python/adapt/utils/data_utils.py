@@ -788,9 +788,17 @@ def split_data(train_data,train_params,it=1):
     te_i = np.zeros((train_params.shape[0],))
     for cls in np.unique(train_params[:,-1]):
         dof = np.array(np.where(train_params[:,-1] == cls))
-        tr_i[dof[0,:dof.shape[1]//2]] = 1
-        te_i[dof[0,dof.shape[1]//2:]] = 1
-
+        if it == 0 or it == 1:
+            tr_i[dof[0,:dof.shape[1]//2]] = 1
+            te_i[dof[0,dof.shape[1]//2:]] = 1
+        elif it == 2 or it == 3:
+            tr_i[dof[0,:dof.shape[1]//4]] = 1
+            tr_i[dof[0,3*dof.shape[1]//4:]] = 1
+            te_i[dof[0,dof.shape[1]//4:3*dof.shape[1]//4]] = 1
+        elif it == 4:
+            tr_i[dof[0,::2]] = 1
+            te_i[dof[0,1::2]] = 1
+        
     train_temp = train_data[tr_i.astype(bool),...]
     params_temp = train_params[tr_i.astype(bool),...]
     val_data = train_data[te_i.astype(bool),...]
@@ -798,7 +806,7 @@ def split_data(train_data,train_params,it=1):
 
     train_data, train_params = train_temp, params_temp
 
-    if it == 0:
+    if it == 0 or it == 2 or it == 4:
         return train_data, train_params, val_data, val_params
-    else:
+    elif it == 1 or it == 3:
         return val_data, val_params,train_data, train_params
